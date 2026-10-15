@@ -15,14 +15,88 @@ from adaptive_agentops.audit import (
     append_mock_health_result,
     append_mock_restart_result,
     append_policy_decision,
+    append_restart_policy_decision,
     initialize_audit_schema,
 )
+from adaptive_agentops.actions import initialize_action_schema, insert_pending_restart_action
 from adaptive_agentops.identity import create_local_run_context
 from adaptive_agentops.mock_restart_adapter import (
     MockRestartAcknowledgement, MockRestartResult, RestartReason, RestartStatus,
 )
 from adaptive_agentops.policy import PolicyDecision
-from adaptive_agentops.tool_requests import MockGetHealthProposal
+from adaptive_agentops.tool_requests import MockGetHealthProposal, MockRestartServiceProposal
+
+
+@pytest.fixture
+def pending_restart_audit(tmp_path):
+    path = tmp_path / "pending-audit.db"
+    conn = sqlite3.connect(path)
+    initialize_action_schema(conn)
+    initialize_audit_schema(conn)
+    context = create_local_run_context()
+    proposal = MockRestartServiceProposal(tool="mock.restart_service", resource="demo-api", arguments={})
+    conn.execute("BEGIN IMMEDIATE")
+    action = insert_pending_restart_action(conn, context, proposal)
+    try:
+        yield conn, path, context, proposal, action
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("commit", [False, True])
+def test_pending_restart_audit_caller_controls_durability(pending_restart_audit, commit):
+    conn, path, context, proposal, action = pending_restart_audit
+    append_restart_policy_decision(conn, context, proposal, PolicyDecision.APPROVAL_REQUIRED, action)
+    observer = sqlite3.connect(path)
+    try:
+        assert conn.in_transaction
+        assert observer.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == 0
+        if commit:
+            conn.commit()
+        else:
+            conn.rollback()
+        assert observer.execute("SELECT COUNT(*) FROM actions").fetchone()[0] == int(commit)
+        assert observer.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == int(commit)
+    finally:
+        observer.close()
+
+
+@pytest.mark.parametrize("kind", ["allow", "string", "deny_action", "missing_action", "binding", "injected", "context"])
+def test_pending_restart_audit_rejects_inconsistent_inputs(pending_restart_audit, kind):
+    conn, _, context, proposal, action = pending_restart_audit
+    decision = PolicyDecision.APPROVAL_REQUIRED
+    if kind == "allow":
+        decision = PolicyDecision.ALLOW
+    elif kind == "string":
+        decision = "APPROVAL_REQUIRED"
+    elif kind == "deny_action":
+        decision = PolicyDecision.DENY
+    elif kind == "missing_action":
+        action = None
+    elif kind == "binding":
+        action = action.model_copy(update={"action_id": uuid4()})
+    elif kind == "injected":
+        proposal = proposal.model_copy(update={"approval_id": "SECRET"})
+    else:
+        context = replace(context, run_id=uuid4())
+    with pytest.raises(ValueError):
+        append_restart_policy_decision(conn, context, proposal, decision, action)
+    assert conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == 0
+    assert conn.in_transaction
+
+
+def test_pending_restart_audit_insert_error_propagates(pending_restart_audit):
+    conn, _, context, proposal, action = pending_restart_audit
+    attempts = []
+    conn.create_function("record_attempt", 0, lambda: attempts.append(1) or 0)
+    conn.execute("""CREATE TRIGGER fail_pending_audit BEFORE INSERT ON audit_events
+        BEGIN SELECT record_attempt(); SELECT RAISE(ABORT, 'SECRET'); END""")
+    with pytest.raises(sqlite3.IntegrityError):
+        append_restart_policy_decision(conn, context, proposal, PolicyDecision.APPROVAL_REQUIRED, action)
+    assert attempts == [1]
+    assert conn.in_transaction
+    assert conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == 0
 
 
 def authorized_proposal() -> MockGetHealthProposal:

@@ -10,7 +10,7 @@ from adaptive_agentops.mock_restart_adapter import (
     MockRestartAcknowledgement, MockRestartResult, RestartReason, RestartStatus,
 )
 from adaptive_agentops.policy import PolicyDecision
-from adaptive_agentops.tool_requests import MockGetHealthProposal
+from adaptive_agentops.tool_requests import EmptyArguments, MockGetHealthProposal, MockRestartServiceProposal
 
 
 class EventKind(str, Enum):
@@ -43,6 +43,70 @@ _REASON_BY_DECISION = {
     PolicyDecision.DENY: ReasonCode.POLICY_DENY,
     PolicyDecision.APPROVAL_REQUIRED: ReasonCode.POLICY_APPROVAL_REQUIRED,
 }
+
+
+def _validate_restart_policy_inputs(context, proposal):
+    """Revalidate stored fields, not lossy model_dump output, at this boundary."""
+    try:
+        if (
+            type(context) is not RunContext or type(context.run_id) is not UUID
+            or set(vars(context)) != set(RunContext.__dataclass_fields__)
+            or any(type(getattr(context, field)) is not str for field in (
+                "requester_id", "agent_id", "environment"
+            ))
+            or type(proposal) is not MockRestartServiceProposal or proposal.model_extra
+            or type(proposal.arguments) is not EmptyArguments
+            or vars(proposal.arguments) or proposal.arguments.model_extra
+        ):
+            raise ValueError
+        return MockRestartServiceProposal.model_validate(
+            {**vars(proposal), "arguments": {}}, strict=True,
+        )
+    except (ValueError, TypeError, AttributeError):
+        raise ValueError("Invalid restart policy inputs") from None
+
+
+def append_restart_policy_decision(
+    conn: Connection, context: RunContext, proposal: MockRestartServiceProposal,
+    decision: PolicyDecision, action: PendingRestartAction | None = None,
+) -> None:
+    """Append creation/denial evidence only; caller owns policy and transaction.
+
+    APPROVAL_REQUIRED must bind an inserted action in this transaction. DENY
+    records the validated requested resource without inventing an action ID.
+    No approval or execution rights are conferred. Trusted context is supplied
+    by internal code; Python types do not authenticate the caller.
+    """
+    proposal = _validate_restart_policy_inputs(context, proposal)
+    if decision is PolicyDecision.APPROVAL_REQUIRED:
+        if type(action) is not PendingRestartAction or action.model_extra:
+            raise ValueError("Expected pending restart action")
+        action = PendingRestartAction.model_validate(dict(vars(action)))
+        if (
+            get_pending_restart_action(conn, action.action_id) != action
+            or any(getattr(context, field) != getattr(action, field) for field in (
+                "run_id", "requester_id", "agent_id", "environment"
+            ))
+            or proposal.tool != action.tool or proposal.resource != action.resource
+            or type(action.arguments) is not EmptyArguments
+            or vars(action.arguments) or action.arguments.model_extra
+        ):
+            raise ValueError("Inconsistent pending restart audit binding")
+    elif decision is not PolicyDecision.DENY or action is not None:
+        raise ValueError("Unsupported restart policy audit decision")
+    conn.execute("""
+        INSERT INTO audit_events (
+            event_id, timestamp, event_kind, run_id, requester_id, agent_id,
+            tool, resource, environment, policy_decision, execution_status,
+            reason_code, action_id, approval_id, dispatch_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        str(uuid4()), datetime.now(timezone.utc).isoformat(), EventKind.POLICY_DECISION.value,
+        str(context.run_id), context.requester_id, context.agent_id, proposal.tool,
+        proposal.resource, context.environment, decision.value,
+        ExecutionStatus.NOT_DISPATCHED.value, _REASON_BY_DECISION[decision].value,
+        str(action.action_id) if action is not None else None, None, None,
+    ))
 
 
 def initialize_audit_schema(conn: Connection) -> None:

@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
 from enum import Enum
 from sqlite3 import Connection
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from adaptive_agentops.actions import PendingRestartAction
-from adaptive_agentops.dispatch_reservations import DispatchReservation
+from adaptive_agentops.actions import PendingRestartAction, get_pending_restart_action
+from adaptive_agentops.dispatch_reservations import DispatchReservation, get_dispatch_reservation_by_action_id
 from adaptive_agentops.identity import RunContext
+from adaptive_agentops.mock_restart_adapter import (
+    MockRestartAcknowledgement, MockRestartResult, RestartReason, RestartStatus,
+)
 from adaptive_agentops.policy import PolicyDecision
 from adaptive_agentops.tool_requests import MockGetHealthProposal
 
@@ -20,6 +23,8 @@ class ExecutionStatus(str, Enum):
     NOT_DISPATCHED = "NOT_DISPATCHED"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    UNCERTAIN = "UNCERTAIN"
 
 
 class ReasonCode(str, Enum):
@@ -29,6 +34,8 @@ class ReasonCode(str, Enum):
     MOCK_HEALTH_READ_SUCCEEDED = "MOCK_HEALTH_READ_SUCCEEDED"
     MOCK_HEALTH_READ_FAILED = "MOCK_HEALTH_READ_FAILED"
     MOCK_RESTART_RESERVED = "MOCK_RESTART_RESERVED"
+    MOCK_RESTART_ACKNOWLEDGED = "MOCK_RESTART_ACKNOWLEDGED"
+    MOCK_RESTART_UNCERTAIN = "MOCK_RESTART_UNCERTAIN"
 
 
 _REASON_BY_DECISION = {
@@ -60,6 +67,11 @@ def initialize_audit_schema(conn: Connection) -> None:
         )
         """
     )
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS one_mock_restart_result_per_dispatch
+        ON audit_events(dispatch_id)
+        WHERE event_kind = 'RESULT' AND tool = 'mock.restart_service'
+    """)
 
 
 def append_policy_decision(
@@ -208,4 +220,90 @@ def append_dispatch_reserved(
         action.tool, action.resource, context.environment, decision.value,
         ExecutionStatus.NOT_DISPATCHED.value, ReasonCode.MOCK_RESTART_RESERVED.value,
         str(action.action_id), str(reservation.approval_id), str(reservation.dispatch_id),
+    ))
+
+
+def append_mock_restart_result(
+    conn: Connection,
+    context: RunContext,
+    reservation: DispatchReservation,
+    restart_result: MockRestartResult,
+) -> None:
+    """Append an attempted restart's outcome; caller owns transaction and COMMIT.
+
+    Call only after an actual adapter attempt returns. The result type cannot
+    attest to an HTTP attempt; enforcing that ordering belongs to a future
+    trusted controller. ACKNOWLEDGED means mock acknowledgement, not a real
+    restart. UNCERTAIN does not mean no effect and never authorizes a retry.
+    """
+    try:
+        if (
+            type(context) is not RunContext or type(context.run_id) is not UUID
+            or set(vars(context)) != set(RunContext.__dataclass_fields__)
+            or type(reservation) is not DispatchReservation or reservation.model_extra
+            or set(vars(reservation)) != set(DispatchReservation.model_fields)
+            or type(restart_result) is not MockRestartResult
+            or set(vars(restart_result)) != set(MockRestartResult.__dataclass_fields__)
+            or type(restart_result.status) is not RestartStatus
+            or type(restart_result.reason) is not RestartReason
+        ):
+            raise ValueError
+        reservation = DispatchReservation.model_validate(dict(vars(reservation)))
+        if restart_result.status is RestartStatus.ACKNOWLEDGED:
+            response = restart_result.response
+            if (
+                restart_result.reason is not RestartReason.MOCK_ACKNOWLEDGED
+                or type(response) is not MockRestartAcknowledgement or response.model_extra
+            ):
+                raise ValueError
+            MockRestartAcknowledgement.model_validate(dict(vars(response)))
+            status = ExecutionStatus.ACKNOWLEDGED
+            reason = ReasonCode.MOCK_RESTART_ACKNOWLEDGED
+        else:
+            if restart_result.reason is RestartReason.MOCK_ACKNOWLEDGED or restart_result.response is not None:
+                raise ValueError
+            status = ExecutionStatus.UNCERTAIN
+            reason = ReasonCode.MOCK_RESTART_UNCERTAIN
+    except (ValueError, TypeError, AttributeError):
+        raise ValueError("Invalid mock restart result inputs") from None
+
+    stored = get_dispatch_reservation_by_action_id(conn, reservation.action_id)
+    action = get_pending_restart_action(conn, reservation.action_id)
+    if (
+        stored != reservation or action is None
+        or action.run_id != reservation.run_id
+        or action.action_fingerprint != reservation.action_fingerprint
+        or any(getattr(context, field) != getattr(action, field) for field in (
+            "run_id", "requester_id", "agent_id", "environment"
+        ))
+    ):
+        raise ValueError("Inconsistent restart result binding")
+    # Preserve the actual historical PDP decision; do not reauthorize or enforce
+    # current expiry when recording an outcome that may arrive after expiry.
+    evidence = conn.execute("""
+        SELECT 1 FROM audit_events
+        WHERE event_kind=? AND action_id=? AND approval_id=? AND dispatch_id=?
+          AND run_id=? AND requester_id=? AND agent_id=? AND environment=?
+          AND tool=? AND resource=? AND policy_decision=? AND execution_status=?
+          AND reason_code=?
+    """, (
+        EventKind.DISPATCH_RESERVED.value, str(reservation.action_id), str(reservation.approval_id),
+        str(reservation.dispatch_id), str(context.run_id), context.requester_id, context.agent_id,
+        context.environment, action.tool, action.resource, PolicyDecision.APPROVAL_REQUIRED.value,
+        ExecutionStatus.NOT_DISPATCHED.value, ReasonCode.MOCK_RESTART_RESERVED.value,
+    )).fetchone()
+    if evidence is None:
+        raise ValueError("Missing correlated pre-dispatch evidence")
+    conn.execute("""
+        INSERT INTO audit_events (
+            event_id, timestamp, event_kind, run_id, requester_id, agent_id,
+            tool, resource, environment, policy_decision, execution_status,
+            reason_code, action_id, approval_id, dispatch_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        str(uuid4()), datetime.now(timezone.utc).isoformat(), EventKind.RESULT.value,
+        str(context.run_id), context.requester_id, context.agent_id, action.tool,
+        action.resource, context.environment, PolicyDecision.APPROVAL_REQUIRED.value,
+        status.value, reason.value, str(reservation.action_id), str(reservation.approval_id),
+        str(reservation.dispatch_id),
     ))

@@ -1,9 +1,10 @@
 import sqlite3
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from uuid import UUID
+from unittest.mock import patch
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -12,10 +13,14 @@ from adaptive_agentops.audit import (
     ExecutionStatus,
     ReasonCode,
     append_mock_health_result,
+    append_mock_restart_result,
     append_policy_decision,
     initialize_audit_schema,
 )
 from adaptive_agentops.identity import create_local_run_context
+from adaptive_agentops.mock_restart_adapter import (
+    MockRestartAcknowledgement, MockRestartResult, RestartReason, RestartStatus,
+)
 from adaptive_agentops.policy import PolicyDecision
 from adaptive_agentops.tool_requests import MockGetHealthProposal
 
@@ -308,3 +313,252 @@ def test_sqlite_write_failure_is_not_swallowed(tmp_path: Path) -> None:
             )
     finally:
         conn.close()
+
+
+def acknowledged_restart():
+    # Synthetic adapter-boundary result; audit tests never send HTTP requests.
+    return MockRestartResult(
+        RestartStatus.ACKNOWLEDGED, RestartReason.MOCK_ACKNOWLEDGED,
+        MockRestartAcknowledgement(service="demo-api", status="restart_requested", simulated=True),
+    )
+
+
+def reserve_for_audit(conn, context):
+    from adaptive_agentops.actions import initialize_action_schema, insert_pending_restart_action
+    from adaptive_agentops.approvals import (
+        ApprovalDecision, initialize_approval_schema, record_operator_decision,
+    )
+    from adaptive_agentops.dispatch_control import ReservationStatus, reserve_approved_restart
+    from adaptive_agentops.dispatch_reservations import initialize_dispatch_reservation_schema
+    from adaptive_agentops.tool_requests import MockRestartServiceProposal
+
+    initialize_action_schema(conn)
+    initialize_approval_schema(conn)
+    initialize_dispatch_reservation_schema(conn)
+    action = insert_pending_restart_action(conn, context, MockRestartServiceProposal(
+        tool="mock.restart_service", resource="demo-api", arguments={}
+    ))
+    conn.commit()
+    record_operator_decision(conn, action.action_id, ApprovalDecision.APPROVED)
+    conn.commit()
+    outcome = reserve_approved_restart(conn, context, action.action_id)
+    assert outcome.status is ReservationStatus.RESERVED
+    return outcome.reservation
+
+
+@pytest.fixture
+def restart_audit(result_conn):
+    context = create_local_run_context()
+    with patch("adaptive_agentops.mock_restart_adapter.request_demo_api_restart") as adapter:
+        reservation = reserve_for_audit(result_conn, context)
+        yield result_conn, context, reservation
+        adapter.assert_not_called()
+
+
+@pytest.mark.parametrize("restart_result, status, reason", [
+    (acknowledged_restart(), "ACKNOWLEDGED", "MOCK_RESTART_ACKNOWLEDGED"),
+    *[(MockRestartResult(RestartStatus.UNCERTAIN, reason), "UNCERTAIN", "MOCK_RESTART_UNCERTAIN")
+      for reason in RestartReason if reason is not RestartReason.MOCK_ACKNOWLEDGED],
+])
+def test_restart_result_correlation_and_commit_visibility(
+    restart_audit, tmp_path, restart_result, status, reason
+):
+    conn, context, reservation = restart_audit
+    before = datetime.now(timezone.utc)
+    assert append_mock_restart_result(conn, context, reservation, restart_result) is None
+    after = datetime.now(timezone.utc)
+    assert conn.in_transaction
+    observer = connect_audit_db(tmp_path)
+    try:
+        assert observer.execute("SELECT COUNT(*) FROM audit_events WHERE event_kind='RESULT'").fetchone()[0] == 0
+    finally:
+        observer.close()
+    conn.commit()
+    reopened = connect_audit_db(tmp_path)
+    try:
+        rows = reopened.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
+        assert len(rows) == 2
+        assert rows[0]["event_kind"] == "DISPATCH_RESERVED"
+        assert rows[0]["execution_status"] == "NOT_DISPATCHED"
+        result = rows[1]
+        assert result["event_kind"] == "RESULT"
+        assert result["execution_status"] == status
+        assert result["reason_code"] == reason
+        assert result["policy_decision"] == "APPROVAL_REQUIRED"
+        for field in ("action_id", "approval_id", "dispatch_id", "run_id"):
+            assert result[field] == str(getattr(reservation, field))
+        for field in ("requester_id", "agent_id", "environment"):
+            assert result[field] == getattr(context, field)
+        assert result["tool"] == "mock.restart_service"
+        assert result["resource"] == "demo-api"
+        assert UUID(result["event_id"]).version == 4
+        assert result["event_id"] != rows[0]["event_id"]
+        timestamp = datetime.fromisoformat(result["timestamp"])
+        assert timestamp.utcoffset() == timedelta(0)
+        assert before <= timestamp <= after
+        assert "SECRET" not in repr([dict(row) for row in rows])
+    finally:
+        reopened.close()
+
+
+@pytest.mark.parametrize("result", [
+    {}, None, RuntimeError("SECRET_ERROR"),
+    MockRestartResult("ACKNOWLEDGED", RestartReason.MOCK_ACKNOWLEDGED, acknowledged_restart().response),
+    MockRestartResult(RestartStatus.ACKNOWLEDGED, "MOCK_ACKNOWLEDGED", acknowledged_restart().response),
+    MockRestartResult(RestartStatus.ACKNOWLEDGED, RestartReason.TIMEOUT, acknowledged_restart().response),
+    MockRestartResult(RestartStatus.ACKNOWLEDGED, RestartReason.MOCK_ACKNOWLEDGED),
+    MockRestartResult(RestartStatus.ACKNOWLEDGED, RestartReason.MOCK_ACKNOWLEDGED, {"secret": "SECRET"}),
+    MockRestartResult(RestartStatus.UNCERTAIN, RestartReason.MOCK_ACKNOWLEDGED),
+    MockRestartResult(RestartStatus.UNCERTAIN, RestartReason.TIMEOUT, acknowledged_restart().response),
+    MockRestartResult(RestartStatus.UNCERTAIN, "SECRET_REASON"),
+    MockRestartResult(None, RestartReason.TIMEOUT),
+    MockRestartResult(RestartStatus.ACKNOWLEDGED, RestartReason.MOCK_ACKNOWLEDGED,
+                      acknowledged_restart().response.model_copy(update={"simulated": 1})),
+    MockRestartResult(RestartStatus.ACKNOWLEDGED, RestartReason.MOCK_ACKNOWLEDGED,
+                      acknowledged_restart().response.model_copy(update={"status": "SECRET_STATUS"})),
+    MockRestartResult(RestartStatus.ACKNOWLEDGED, RestartReason.MOCK_ACKNOWLEDGED,
+                      acknowledged_restart().response.model_copy(update={"credentials": "SECRET"})),
+])
+def test_restart_rejects_invalid_or_contradictory_result(restart_audit, result):
+    conn, context, reservation = restart_audit
+    with pytest.raises(ValueError, match="Invalid mock restart result inputs") as error:
+        append_mock_restart_result(conn, context, reservation, result)
+    assert "SECRET" not in str(error.value)
+    assert not conn.in_transaction
+    assert conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("field, value", [
+    ("action_id", uuid4()), ("approval_id", uuid4()), ("dispatch_id", uuid4()),
+    ("run_id", uuid4()), ("action_fingerprint", "0" * 64),
+    ("state", "EXECUTED"), ("approval_id", "SECRET_ID"),
+    ("credentials", "SECRET_METADATA"),
+])
+def test_restart_rejects_wrong_reservation_binding(restart_audit, field, value):
+    conn, context, reservation = restart_audit
+    forged = reservation.model_copy(update={field: value})
+    with pytest.raises(ValueError):
+        append_mock_restart_result(conn, context, forged, acknowledged_restart())
+    assert not conn.in_transaction
+    assert conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("field, value", [
+    ("run_id", uuid4()), ("requester_id", "SECRET_REQUESTER"),
+    ("agent_id", "other"), ("environment", "production"),
+])
+def test_restart_rejects_untrusted_context_binding(restart_audit, field, value):
+    conn, context, reservation = restart_audit
+    with pytest.raises(ValueError):
+        append_mock_restart_result(conn, replace(context, **{field: value}), reservation, acknowledged_restart())
+    assert not conn.in_transaction
+
+
+def test_restart_requires_typed_context_reservation_and_result(restart_audit):
+    conn, context, reservation = restart_audit
+    for inputs in (
+        ({"run_id": context.run_id}, reservation, acknowledged_restart()),
+        (context, reservation.model_dump(), acknowledged_restart()),
+        (context, reservation, None),
+    ):
+        with pytest.raises(ValueError):
+            append_mock_restart_result(conn, *inputs)
+    assert not conn.in_transaction
+
+
+@pytest.mark.parametrize("field", ["action_id", "approval_id", "dispatch_id", "requester_id", "policy_decision"])
+def test_restart_requires_correlated_pre_dispatch_evidence(restart_audit, field):
+    conn, context, reservation = restart_audit
+    conn.execute(f"UPDATE audit_events SET {field}=?", ("wrong",))
+    conn.commit()
+    with pytest.raises(ValueError, match="pre-dispatch"):
+        append_mock_restart_result(conn, context, reservation, acknowledged_restart())
+    assert not conn.in_transaction
+
+
+def test_restart_duplicate_result_sqlite_guard_and_independent_dispatches(restart_audit):
+    conn, context, first = restart_audit
+    append_mock_restart_result(conn, context, first, acknowledged_restart())
+    conn.commit()
+    with pytest.raises(sqlite3.IntegrityError):
+        append_mock_restart_result(
+            conn, context, first, MockRestartResult(RestartStatus.UNCERTAIN, RestartReason.TIMEOUT)
+        )
+    conn.rollback()
+    # Direct SQL also hits the unique index, independently of Python validation.
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("""
+            INSERT INTO audit_events
+            SELECT ?, timestamp, event_kind, run_id, requester_id, agent_id,
+                   tool, resource, environment, policy_decision, execution_status,
+                   reason_code, action_id, approval_id, dispatch_id
+            FROM audit_events WHERE event_kind='RESULT'
+        """, (str(uuid4()),))
+    conn.rollback()
+    second = reserve_for_audit(conn, context)
+    assert first.action_fingerprint == second.action_fingerprint
+    assert first.dispatch_id != second.dispatch_id
+    append_mock_restart_result(conn, context, second, acknowledged_restart())
+    # Read RESULT rows remain independent and do not participate in this index.
+    for _ in range(2):
+        append_mock_health_result(conn, context, authorized_proposal(), ExecutionStatus.SUCCEEDED)
+    conn.commit()
+    assert conn.execute("SELECT COUNT(*) FROM audit_events WHERE event_kind='RESULT'").fetchone()[0] == 4
+
+
+def test_restart_result_rollback_removes_only_result(restart_audit, tmp_path):
+    conn, context, reservation = restart_audit
+    conn.execute("BEGIN IMMEDIATE")
+    append_mock_restart_result(conn, context, reservation, acknowledged_restart())
+    assert conn.in_transaction
+    conn.rollback()
+    reopened = connect_audit_db(tmp_path)
+    try:
+        assert [row[0] for row in reopened.execute("SELECT event_kind FROM audit_events")] == ["DISPATCH_RESERVED"]
+    finally:
+        reopened.close()
+
+
+def test_restart_result_insert_error_propagates_without_retry(restart_audit):
+    conn, context, reservation = restart_audit
+    attempts = []
+    conn.create_function("note_result_attempt", 0, lambda: attempts.append(1) or 0)
+    conn.execute("""
+        CREATE TRIGGER fail_restart_result BEFORE INSERT ON audit_events
+        WHEN NEW.event_kind='RESULT'
+        BEGIN
+            SELECT note_result_attempt();
+            SELECT RAISE(ABORT, 'SECRET_INSERT_FAILURE');
+        END
+    """)
+    conn.commit()
+    conn.execute("BEGIN IMMEDIATE")
+    with pytest.raises(sqlite3.IntegrityError):
+        append_mock_restart_result(conn, context, reservation, acknowledged_restart())
+    assert attempts == [1]
+    assert conn.in_transaction
+    assert conn.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == 1
+    conn.rollback()
+
+
+def test_restart_audit_does_not_change_reservation_or_consume_approval(restart_audit):
+    conn, context, reservation = restart_audit
+    tables = ("actions", "approvals", "dispatch_reservations")
+    before = {table: [tuple(row) for row in conn.execute(f"SELECT * FROM {table}")] for table in tables}
+    with patch("adaptive_agentops.policy.evaluate_policy") as pdp:
+        append_mock_restart_result(conn, context, reservation, acknowledged_restart())
+        pdp.assert_not_called()
+    conn.commit()
+    assert {table: [tuple(row) for row in conn.execute(f"SELECT * FROM {table}")] for table in tables} == before
+
+
+def test_restart_outcome_can_be_audited_after_original_expiry(restart_audit):
+    conn, context, reservation = restart_audit
+    with patch("adaptive_agentops.audit.datetime") as clock:
+        clock.now.return_value = reservation.reserved_at + timedelta(hours=1)
+        append_mock_restart_result(conn, context, reservation, MockRestartResult(
+            RestartStatus.UNCERTAIN, RestartReason.TIMEOUT
+        ))
+    conn.commit()
+    row = conn.execute("SELECT execution_status FROM audit_events WHERE event_kind='RESULT'").fetchone()
+    assert row[0] == "UNCERTAIN"

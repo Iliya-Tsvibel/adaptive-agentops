@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -23,11 +23,29 @@ def new_action(conn, context=None):
 
 
 @pytest.fixture
-def db(tmp_path):
+def approval_clock():
+    """Freeze only this module's DB tests; explicit boundary patches nest inside.
+
+    Both patches unwind on failure as well as success. This removes live-clock
+    ordering assumptions, not a proven cause of the historical failures.
+    """
+    now = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+    with patch("adaptive_agentops.actions.datetime", wraps=datetime) as action_clock, patch(
+        "adaptive_agentops.approvals.datetime", wraps=datetime
+    ) as decision_clock:
+        action_clock.now.return_value = now
+        decision_clock.now.return_value = now
+        yield now
+
+
+@pytest.fixture
+def db(tmp_path, approval_clock):
     conn = sqlite3.connect(tmp_path / "state.db", timeout=0)
     initialize_action_schema(conn)
     initialize_approval_schema(conn)
     action = new_action(conn)
+    assert action.created_at == approval_clock
+    assert action.expires_at == approval_clock + timedelta(minutes=10)
     conn.commit()
     try:
         yield conn, action, tmp_path / "state.db"

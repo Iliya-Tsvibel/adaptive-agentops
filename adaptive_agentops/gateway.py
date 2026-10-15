@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from enum import Enum
 from sqlite3 import Connection
 
-from adaptive_agentops.audit import append_policy_decision
+from adaptive_agentops.audit import (
+    ExecutionStatus,
+    append_mock_health_result,
+    append_policy_decision,
+)
 from adaptive_agentops.identity import RunContext
 from adaptive_agentops.mock_adapter import DemoApiHealth, get_demo_api_health
 from adaptive_agentops.policy import PolicyDecision, evaluate_policy
@@ -62,6 +66,7 @@ class MockHealthReadStatus(str, Enum):
     NOT_DISPATCHED = "NOT_DISPATCHED"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
+    AUDIT_FAILED = "AUDIT_FAILED"
 
 
 @dataclass(frozen=True)
@@ -76,7 +81,7 @@ def execute_mock_health_read(
     context: object,
     proposal: object,
 ) -> MockHealthReadResult:
-    """Dispatch once after committed authorization; outcomes are not audited yet."""
+    """Dispatch once after committed authorization, then commit a separate RESULT."""
     preflight = evaluate_and_audit_preflight(conn, context, proposal)
     # A successful audited preflight returns only after its transaction commits.
     if preflight.error is not False or preflight.decision is not PolicyDecision.ALLOW:
@@ -88,13 +93,34 @@ def execute_mock_health_read(
         health = get_demo_api_health()
         if not isinstance(health, DemoApiHealth):
             raise TypeError("Unexpected adapter result")
-        health = DemoApiHealth.model_validate(health.model_dump())
+        health = DemoApiHealth.model_validate(health.model_dump(warnings=False))
     except Exception:
+        health = None
+        status = ExecutionStatus.FAILED
+    else:
+        status = ExecutionStatus.SUCCEEDED
+
+    transaction_started = False
+    try:
+        if conn.in_transaction:
+            return MockHealthReadResult(
+                status=MockHealthReadStatus.AUDIT_FAILED, decision=preflight.decision
+            )
+        conn.execute("BEGIN")
+        transaction_started = True
+        append_mock_health_result(conn, context, proposal, status)
+        conn.commit()
+    except Exception:
+        if transaction_started:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         return MockHealthReadResult(
-            status=MockHealthReadStatus.FAILED, decision=preflight.decision
+            status=MockHealthReadStatus.AUDIT_FAILED, decision=preflight.decision
         )
     return MockHealthReadResult(
-        status=MockHealthReadStatus.SUCCEEDED,
+        status=MockHealthReadStatus(status.value),
         decision=preflight.decision,
         health=health,
     )

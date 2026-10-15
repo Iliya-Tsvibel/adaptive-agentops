@@ -7,7 +7,11 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from adaptive_agentops.audit import initialize_audit_schema
+from adaptive_agentops.audit import (
+    ExecutionStatus,
+    append_mock_health_result,
+    initialize_audit_schema,
+)
 from adaptive_agentops.gateway import (
     PreflightResult,
     MockHealthReadStatus,
@@ -66,6 +70,15 @@ def persisted_decisions(tmp_path: Path) -> list[str]:
 
 
 @pytest.fixture
+def result_append():
+    with patch(
+        "adaptive_agentops.gateway.append_mock_health_result",
+        wraps=append_mock_health_result,
+    ) as append:
+        yield append
+
+
+@pytest.fixture
 def execution_adapter():
     with patch("adaptive_agentops.gateway.get_demo_api_health") as adapter:
         adapter.return_value = DemoApiHealth(
@@ -111,13 +124,15 @@ def test_execute_allow_only_after_commit(tmp_path, execution_adapter):
         rows = reopened.execute(
             "SELECT event_kind, execution_status FROM audit_events"
         ).fetchall()
-        assert [tuple(row) for row in rows] == [("POLICY_DECISION", "NOT_DISPATCHED")]
+        assert [tuple(row) for row in rows] == [
+            ("POLICY_DECISION", "NOT_DISPATCHED"), ("RESULT", "SUCCEEDED")
+        ]
     finally:
         reopened.close()
 
 
 @pytest.mark.parametrize("decision", [PolicyDecision.DENY, PolicyDecision.APPROVAL_REQUIRED])
-def test_execute_non_allow_never_dispatches(tmp_path, execution_adapter, decision):
+def test_execute_non_allow_never_dispatches(tmp_path, execution_adapter, decision, result_append):
     conn = prepared_audit_conn(tmp_path)
     try:
         with patch("adaptive_agentops.gateway.evaluate_policy", return_value=decision):
@@ -128,13 +143,14 @@ def test_execute_non_allow_never_dispatches(tmp_path, execution_adapter, decisio
         assert result.decision is decision
         assert result.health is None
         execution_adapter.assert_not_called()
+        result_append.assert_not_called()
     finally:
         conn.close()
     assert persisted_decisions(tmp_path) == [decision.value]
 
 
 @pytest.mark.parametrize("bad_context", [True, False])
-def test_execute_invalid_input_never_dispatches(tmp_path, execution_adapter, bad_context):
+def test_execute_invalid_input_never_dispatches(tmp_path, execution_adapter, bad_context, result_append):
     conn = prepared_audit_conn(tmp_path)
     try:
         result = execute_mock_health_read(
@@ -146,6 +162,7 @@ def test_execute_invalid_input_never_dispatches(tmp_path, execution_adapter, bad
         assert result.decision is None
         assert result.health is None
         execution_adapter.assert_not_called()
+        result_append.assert_not_called()
     finally:
         conn.close()
     assert persisted_decisions(tmp_path) == []
@@ -155,7 +172,7 @@ def test_execute_invalid_input_never_dispatches(tmp_path, execution_adapter, bad
     {"side_effect": RuntimeError("private PDP details")},
     {"return_value": "ALLOW"},
 ])
-def test_execute_pdp_error_never_dispatches(tmp_path, execution_adapter, pdp_behavior):
+def test_execute_pdp_error_never_dispatches(tmp_path, execution_adapter, pdp_behavior, result_append):
     conn = prepared_audit_conn(tmp_path)
     try:
         with patch("adaptive_agentops.gateway.evaluate_policy", **pdp_behavior):
@@ -166,13 +183,14 @@ def test_execute_pdp_error_never_dispatches(tmp_path, execution_adapter, pdp_beh
         assert result.decision is None
         assert result.health is None
         execution_adapter.assert_not_called()
+        result_append.assert_not_called()
     finally:
         conn.close()
     assert persisted_decisions(tmp_path) == []
 
 
 @pytest.mark.parametrize("failure", ["insert", "commit", "closed", "active_transaction"])
-def test_execute_audit_failure_never_dispatches(tmp_path, execution_adapter, failure):
+def test_execute_audit_failure_never_dispatches(tmp_path, execution_adapter, failure, result_append):
     conn = sqlite3.connect(tmp_path / "audit.db", factory=CommitFailingConnection)
     try:
         initialize_audit_schema(conn)
@@ -196,6 +214,7 @@ def test_execute_audit_failure_never_dispatches(tmp_path, execution_adapter, fai
         assert result.decision is None
         assert result.health is None
         execution_adapter.assert_not_called()
+        result_append.assert_not_called()
         if failure == "active_transaction":
             assert conn.in_transaction is True
         elif failure != "closed":
@@ -237,10 +256,12 @@ def test_execute_adapter_failure_preserves_authorization(tmp_path, execution_ada
         rows = conn.execute(
             "SELECT event_kind, execution_status FROM audit_events"
         ).fetchall()
-        assert [tuple(row) for row in rows] == [("POLICY_DECISION", "NOT_DISPATCHED")]
+        assert [tuple(row) for row in rows] == [
+            ("POLICY_DECISION", "NOT_DISPATCHED"), ("RESULT", "FAILED")
+        ]
     finally:
         conn.close()
-    assert persisted_decisions(tmp_path) == ["ALLOW"]
+    assert persisted_decisions(tmp_path) == ["ALLOW", "ALLOW"]
 
 
 @pytest.mark.parametrize("health", [
@@ -411,6 +432,142 @@ class CommitFailingConnection(sqlite3.Connection):
         if self.fail_commit:
             raise sqlite3.OperationalError("commit failed")
         super().commit()
+
+
+class ResultFailureConnection(sqlite3.Connection):
+    failure = None
+    begin_calls = 0
+    commit_calls = 0
+    rollback_calls = 0
+
+    def execute(self, sql, parameters=()):
+        if sql == "BEGIN":
+            self.begin_calls += 1
+            if self.failure == "begin":
+                raise sqlite3.OperationalError("SECRET_BEGIN")
+        return super().execute(sql, parameters)
+
+    def commit(self):
+        self.commit_calls += 1
+        if self.failure in ("commit", "rollback"):
+            raise sqlite3.OperationalError("SECRET_COMMIT")
+        super().commit()
+
+    def rollback(self):
+        self.rollback_calls += 1
+        if self.failure == "rollback":
+            raise sqlite3.OperationalError("SECRET_ROLLBACK")
+        super().rollback()
+
+
+@pytest.mark.parametrize("adapter_fails", [False, True])
+def test_result_contract_is_durable(tmp_path, execution_adapter, result_append, adapter_fails):
+    conn = prepared_audit_conn(tmp_path)
+    context = create_local_run_context()
+    proposal = authorized_proposal()
+    if adapter_fails:
+        execution_adapter.side_effect = RuntimeError("SECRET_EXCEPTION")
+    else:
+        execution_adapter.return_value = DemoApiHealth(
+            service="demo-api", status="healthy", reason="SECRET_RESPONSE"
+        )
+    expected = ExecutionStatus.FAILED if adapter_fails else ExecutionStatus.SUCCEEDED
+    try:
+        result = execute_mock_health_read(conn, context, proposal)
+        assert result.status.value == expected.value
+        assert result.decision is PolicyDecision.ALLOW
+        assert not conn.in_transaction
+        result_append.assert_called_once_with(conn, context, proposal, expected)
+        execution_adapter.assert_called_once_with()
+    finally:
+        conn.close()
+    reopened = connect_audit_db(tmp_path)
+    try:
+        rows = reopened.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
+        assert len(rows) == 2
+        policy, outcome = rows
+        assert policy["event_kind"] == "POLICY_DECISION"
+        assert policy["execution_status"] == "NOT_DISPATCHED"
+        assert outcome["event_kind"] == "RESULT"
+        assert outcome["execution_status"] == expected.value
+        assert outcome["reason_code"] == "MOCK_HEALTH_READ_" + expected.value
+        assert outcome["policy_decision"] == "ALLOW"
+        assert outcome["run_id"] == str(context.run_id)
+        assert outcome["requester_id"] == context.requester_id
+        assert outcome["agent_id"] == context.agent_id
+        assert outcome["environment"] == "local-mock"
+        assert outcome["tool"] == "mock.get_health"
+        assert outcome["resource"] == "demo-api"
+        assert outcome["event_id"] != policy["event_id"]
+        assert outcome["timestamp"].endswith("+00:00")
+        assert all(outcome[key] is None for key in ("action_id", "approval_id", "dispatch_id"))
+        assert "SECRET_" not in repr([dict(row) for row in rows])
+    finally:
+        reopened.close()
+
+
+@pytest.mark.parametrize("failure", ["insert", "begin", "commit", "rollback", "foreign_transaction"])
+@pytest.mark.parametrize("adapter_fails", [False, True])
+def test_result_audit_failure_is_not_retried(
+    tmp_path, execution_adapter, result_append, failure, adapter_fails
+):
+    conn = sqlite3.connect(tmp_path / "audit.db", factory=ResultFailureConnection)
+    context = create_local_run_context()
+    proposal = authorized_proposal()
+    health = execution_adapter.return_value
+    try:
+        initialize_audit_schema(conn)
+        if failure == "insert":
+            conn.execute("""
+                CREATE TRIGGER reject_result BEFORE INSERT ON audit_events
+                WHEN NEW.event_kind = 'RESULT'
+                BEGIN SELECT RAISE(ABORT, 'SECRET_INSERT'); END
+            """)
+        conn.commit()
+
+        def attempt():
+            assert not conn.in_transaction
+            assert persisted_decisions(tmp_path) == ["ALLOW"]
+            conn.begin_calls = conn.commit_calls = conn.rollback_calls = 0
+            conn.failure = failure
+            if failure == "foreign_transaction":
+                conn.execute("BEGIN")
+                conn.execute("UPDATE audit_events SET reason_code = 'caller-marker'")
+                conn.begin_calls = 0
+            if adapter_fails:
+                raise RuntimeError("SECRET_ADAPTER")
+            return health
+
+        execution_adapter.side_effect = attempt
+        result = execute_mock_health_read(conn, context, proposal)
+        assert result.status is MockHealthReadStatus.AUDIT_FAILED
+        assert result.decision is PolicyDecision.ALLOW
+        assert result.health is None
+        assert "SECRET_" not in repr(result)
+        execution_adapter.assert_called_once_with()
+        assert conn.begin_calls == (0 if failure == "foreign_transaction" else 1)
+        assert conn.commit_calls == (1 if failure in ("commit", "rollback") else 0)
+        owned = failure in ("insert", "commit", "rollback")
+        assert conn.rollback_calls == int(owned)
+        assert conn.in_transaction is (failure in ("rollback", "foreign_transaction"))
+        if owned:
+            expected = ExecutionStatus.FAILED if adapter_fails else ExecutionStatus.SUCCEEDED
+            result_append.assert_called_once_with(conn, context, proposal, expected)
+        else:
+            result_append.assert_not_called()
+        if failure == "foreign_transaction":
+            assert conn.execute("SELECT reason_code FROM audit_events").fetchone()[0] == "caller-marker"
+        reopened = connect_audit_db(tmp_path)
+        try:
+            rows = reopened.execute("SELECT * FROM audit_events").fetchall()
+            assert len(rows) == 1
+            assert rows[0]["event_kind"] == "POLICY_DECISION"
+            assert rows[0]["reason_code"] == "POLICY_ALLOW"
+            assert "SECRET_" not in repr(dict(rows[0]))
+        finally:
+            reopened.close()
+    finally:
+        conn.close()
 
 
 def test_simulated_commit_failure_fails_closed(tmp_path: Path) -> None:

@@ -10,16 +10,21 @@ from adaptive_agentops.tool_requests import MockGetHealthProposal
 
 class EventKind(str, Enum):
     POLICY_DECISION = "POLICY_DECISION"
+    RESULT = "RESULT"
 
 
 class ExecutionStatus(str, Enum):
     NOT_DISPATCHED = "NOT_DISPATCHED"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
 
 
 class ReasonCode(str, Enum):
     POLICY_ALLOW = "POLICY_ALLOW"
     POLICY_DENY = "POLICY_DENY"
     POLICY_APPROVAL_REQUIRED = "POLICY_APPROVAL_REQUIRED"
+    MOCK_HEALTH_READ_SUCCEEDED = "MOCK_HEALTH_READ_SUCCEEDED"
+    MOCK_HEALTH_READ_FAILED = "MOCK_HEALTH_READ_FAILED"
 
 
 _REASON_BY_DECISION = {
@@ -100,6 +105,61 @@ def append_policy_decision(
             decision.value,
             ExecutionStatus.NOT_DISPATCHED.value,
             _REASON_BY_DECISION[decision].value,
+            None,
+            None,
+            None,
+        ),
+    )
+
+
+def append_mock_health_result(
+    conn: Connection,
+    context: RunContext,
+    proposal: MockGetHealthProposal,
+    status: ExecutionStatus,
+) -> None:
+    """Append a previously authorized read's outcome; caller owns the transaction.
+
+    This does not verify prior authorization or establish durability. The caller
+    must authorize before execution and commit this event for it to persist.
+    """
+    if not isinstance(context, RunContext):
+        raise TypeError("context must be a RunContext")
+    if not isinstance(proposal, MockGetHealthProposal):
+        raise TypeError("proposal must be a MockGetHealthProposal")
+    # Revalidate even models created through Pydantic's unchecked construction.
+    proposal = MockGetHealthProposal.model_validate(proposal.model_dump(warnings=False))
+    if proposal.resource != "demo-api" or context.environment != "local-mock":
+        raise ValueError("Only the local demo-api health read is supported")
+    if status is ExecutionStatus.SUCCEEDED:
+        reason = ReasonCode.MOCK_HEALTH_READ_SUCCEEDED
+    elif status is ExecutionStatus.FAILED:
+        reason = ReasonCode.MOCK_HEALTH_READ_FAILED
+    else:
+        raise ValueError("status must be ExecutionStatus.SUCCEEDED or FAILED")
+
+    conn.execute(
+        """
+        INSERT INTO audit_events (
+            event_id, timestamp, event_kind, run_id, requester_id, agent_id,
+            tool, resource, environment, policy_decision, execution_status,
+            reason_code, action_id, approval_id, dispatch_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            str(uuid4()),
+            datetime.now(timezone.utc).isoformat(),
+            EventKind.RESULT.value,
+            str(context.run_id),
+            context.requester_id,
+            context.agent_id,
+            proposal.tool,
+            proposal.resource,
+            context.environment,
+            PolicyDecision.ALLOW.value,
+            status.value,
+            reason.value,
             None,
             None,
             None,

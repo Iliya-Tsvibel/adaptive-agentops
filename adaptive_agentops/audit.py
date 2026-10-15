@@ -3,6 +3,8 @@ from enum import Enum
 from sqlite3 import Connection
 from uuid import uuid4
 
+from adaptive_agentops.actions import PendingRestartAction
+from adaptive_agentops.dispatch_reservations import DispatchReservation
 from adaptive_agentops.identity import RunContext
 from adaptive_agentops.policy import PolicyDecision
 from adaptive_agentops.tool_requests import MockGetHealthProposal
@@ -11,6 +13,7 @@ from adaptive_agentops.tool_requests import MockGetHealthProposal
 class EventKind(str, Enum):
     POLICY_DECISION = "POLICY_DECISION"
     RESULT = "RESULT"
+    DISPATCH_RESERVED = "DISPATCH_RESERVED"
 
 
 class ExecutionStatus(str, Enum):
@@ -25,6 +28,7 @@ class ReasonCode(str, Enum):
     POLICY_APPROVAL_REQUIRED = "POLICY_APPROVAL_REQUIRED"
     MOCK_HEALTH_READ_SUCCEEDED = "MOCK_HEALTH_READ_SUCCEEDED"
     MOCK_HEALTH_READ_FAILED = "MOCK_HEALTH_READ_FAILED"
+    MOCK_RESTART_RESERVED = "MOCK_RESTART_RESERVED"
 
 
 _REASON_BY_DECISION = {
@@ -165,3 +169,43 @@ def append_mock_health_result(
             None,
         ),
     )
+
+
+def append_dispatch_reserved(
+    conn: Connection,
+    context: RunContext,
+    action: PendingRestartAction,
+    reservation: DispatchReservation,
+    decision: PolicyDecision,
+) -> None:
+    """Append pre-dispatch evidence; caller owns authorization and transaction."""
+    if type(context) is not RunContext:
+        raise TypeError("Expected trusted RunContext")
+    if type(action) is not PendingRestartAction or type(reservation) is not DispatchReservation:
+        raise TypeError("Expected action and reservation models")
+    if decision is not PolicyDecision.APPROVAL_REQUIRED:
+        raise ValueError("Expected fresh APPROVAL_REQUIRED decision")
+    action = PendingRestartAction.model_validate(action.model_dump(warnings=False))
+    reservation = DispatchReservation.model_validate(reservation.model_dump(warnings=False))
+    if (
+        any(getattr(context, field) != getattr(action, field) for field in (
+            "run_id", "requester_id", "agent_id", "environment"
+        ))
+        or reservation.action_id != action.action_id
+        or reservation.run_id != action.run_id
+        or reservation.action_fingerprint != action.action_fingerprint
+    ):
+        raise ValueError("Inconsistent reservation audit binding")
+    conn.execute("""
+        INSERT INTO audit_events (
+            event_id, timestamp, event_kind, run_id, requester_id, agent_id,
+            tool, resource, environment, policy_decision, execution_status,
+            reason_code, action_id, approval_id, dispatch_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        str(uuid4()), datetime.now(timezone.utc).isoformat(), EventKind.DISPATCH_RESERVED.value,
+        str(context.run_id), context.requester_id, context.agent_id,
+        action.tool, action.resource, context.environment, decision.value,
+        ExecutionStatus.NOT_DISPATCHED.value, ReasonCode.MOCK_RESTART_RESERVED.value,
+        str(action.action_id), str(reservation.approval_id), str(reservation.dispatch_id),
+    ))

@@ -1,14 +1,22 @@
 import sqlite3
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import httpx
+import pytest
+from pydantic import ValidationError
 
 from adaptive_agentops.audit import initialize_audit_schema
 from adaptive_agentops.gateway import (
     PreflightResult,
+    MockHealthReadStatus,
     evaluate_and_audit_preflight,
+    execute_mock_health_read,
     preflight_tool_call,
 )
 from adaptive_agentops.identity import create_local_run_context
+from adaptive_agentops.mock_adapter import DemoApiHealth
 from adaptive_agentops.policy import PolicyDecision, evaluate_policy
 from adaptive_agentops.tool_requests import MockGetHealthProposal
 
@@ -55,6 +63,204 @@ def persisted_decisions(tmp_path: Path) -> list[str]:
         return [row["policy_decision"] for row in rows]
     finally:
         reopened.close()
+
+
+@pytest.fixture
+def execution_adapter():
+    with patch("adaptive_agentops.gateway.get_demo_api_health") as adapter:
+        adapter.return_value = DemoApiHealth(
+            service="demo-api", status="unhealthy", reason="stalled_worker"
+        )
+        yield adapter
+
+
+def test_execute_allow_only_after_commit(tmp_path, execution_adapter):
+    conn = prepared_audit_conn(tmp_path)
+    context = create_local_run_context()
+    proposal = authorized_proposal()
+    health = execution_adapter.return_value
+
+    def read_after_commit():
+        assert conn.in_transaction is False
+        assert persisted_decisions(tmp_path) == ["ALLOW"]
+        return health
+
+    execution_adapter.side_effect = read_after_commit
+    try:
+        with patch(
+            "adaptive_agentops.gateway.evaluate_and_audit_preflight",
+            wraps=evaluate_and_audit_preflight,
+        ) as preflight, patch(
+            "adaptive_agentops.gateway.evaluate_policy", wraps=evaluate_policy
+        ) as pdp:
+            result = execute_mock_health_read(conn, context, proposal)
+        preflight.assert_called_once_with(conn, context, proposal)
+        pdp.assert_called_once_with(context, proposal)
+        execution_adapter.assert_called_once_with()
+        assert result.status is MockHealthReadStatus.SUCCEEDED
+        assert result.decision is PolicyDecision.ALLOW
+        assert result.health == health
+        with pytest.raises(FrozenInstanceError):
+            result.health = None
+        with pytest.raises(ValidationError):
+            result.health.reason = "changed"
+    finally:
+        conn.close()
+    reopened = connect_audit_db(tmp_path)
+    try:
+        rows = reopened.execute(
+            "SELECT event_kind, execution_status FROM audit_events"
+        ).fetchall()
+        assert [tuple(row) for row in rows] == [("POLICY_DECISION", "NOT_DISPATCHED")]
+    finally:
+        reopened.close()
+
+
+@pytest.mark.parametrize("decision", [PolicyDecision.DENY, PolicyDecision.APPROVAL_REQUIRED])
+def test_execute_non_allow_never_dispatches(tmp_path, execution_adapter, decision):
+    conn = prepared_audit_conn(tmp_path)
+    try:
+        with patch("adaptive_agentops.gateway.evaluate_policy", return_value=decision):
+            result = execute_mock_health_read(
+                conn, create_local_run_context(), authorized_proposal()
+            )
+        assert result.status is MockHealthReadStatus.NOT_DISPATCHED
+        assert result.decision is decision
+        assert result.health is None
+        execution_adapter.assert_not_called()
+    finally:
+        conn.close()
+    assert persisted_decisions(tmp_path) == [decision.value]
+
+
+@pytest.mark.parametrize("bad_context", [True, False])
+def test_execute_invalid_input_never_dispatches(tmp_path, execution_adapter, bad_context):
+    conn = prepared_audit_conn(tmp_path)
+    try:
+        result = execute_mock_health_read(
+            conn,
+            object() if bad_context else create_local_run_context(),
+            authorized_proposal() if bad_context else {"tool": "mock.get_health"},
+        )
+        assert result.status is MockHealthReadStatus.NOT_DISPATCHED
+        assert result.decision is None
+        assert result.health is None
+        execution_adapter.assert_not_called()
+    finally:
+        conn.close()
+    assert persisted_decisions(tmp_path) == []
+
+
+@pytest.mark.parametrize("pdp_behavior", [
+    {"side_effect": RuntimeError("private PDP details")},
+    {"return_value": "ALLOW"},
+])
+def test_execute_pdp_error_never_dispatches(tmp_path, execution_adapter, pdp_behavior):
+    conn = prepared_audit_conn(tmp_path)
+    try:
+        with patch("adaptive_agentops.gateway.evaluate_policy", **pdp_behavior):
+            result = execute_mock_health_read(
+                conn, create_local_run_context(), authorized_proposal()
+            )
+        assert result.status is MockHealthReadStatus.NOT_DISPATCHED
+        assert result.decision is None
+        assert result.health is None
+        execution_adapter.assert_not_called()
+    finally:
+        conn.close()
+    assert persisted_decisions(tmp_path) == []
+
+
+@pytest.mark.parametrize("failure", ["insert", "commit", "closed", "active_transaction"])
+def test_execute_audit_failure_never_dispatches(tmp_path, execution_adapter, failure):
+    conn = sqlite3.connect(tmp_path / "audit.db", factory=CommitFailingConnection)
+    try:
+        initialize_audit_schema(conn)
+        conn.commit()
+        if failure == "insert":
+            conn.execute("""
+                CREATE TRIGGER reject_audit BEFORE INSERT ON audit_events
+                BEGIN SELECT RAISE(ABORT, 'controlled insert failure'); END
+            """)
+            conn.commit()
+        elif failure == "commit":
+            conn.fail_commit = True
+        elif failure == "closed":
+            conn.close()
+        else:
+            conn.execute("BEGIN")
+        result = execute_mock_health_read(
+            conn, create_local_run_context(), authorized_proposal()
+        )
+        assert result.status is MockHealthReadStatus.NOT_DISPATCHED
+        assert result.decision is None
+        assert result.health is None
+        execution_adapter.assert_not_called()
+        if failure == "active_transaction":
+            assert conn.in_transaction is True
+        elif failure != "closed":
+            assert conn.in_transaction is False
+    finally:
+        conn.close()
+    assert persisted_decisions(tmp_path) == []
+
+
+@pytest.mark.parametrize("failure", ["http", "timeout", "validation", "size", "unexpected"])
+def test_execute_adapter_failure_preserves_authorization(tmp_path, execution_adapter, failure):
+    request = httpx.Request("GET", "http://127.0.0.1:8001/services/demo-api/health")
+    errors = {
+        "http": httpx.HTTPStatusError(
+            "private HTTP details", request=request,
+            response=httpx.Response(500, request=request),
+        ),
+        "timeout": httpx.ReadTimeout("private timeout details"),
+        "size": ValueError("private size details"),
+        "unexpected": RuntimeError("private implementation details"),
+    }
+    if failure == "validation":
+        try:
+            DemoApiHealth.model_validate({})
+        except ValidationError as error:
+            execution_adapter.side_effect = error
+    else:
+        execution_adapter.side_effect = errors[failure]
+    conn = prepared_audit_conn(tmp_path)
+    try:
+        result = execute_mock_health_read(
+            conn, create_local_run_context(), authorized_proposal()
+        )
+        assert result.status is MockHealthReadStatus.FAILED
+        assert result.decision is PolicyDecision.ALLOW
+        assert result.health is None
+        assert "private" not in repr(result)
+        execution_adapter.assert_called_once_with()
+        rows = conn.execute(
+            "SELECT event_kind, execution_status FROM audit_events"
+        ).fetchall()
+        assert [tuple(row) for row in rows] == [("POLICY_DECISION", "NOT_DISPATCHED")]
+    finally:
+        conn.close()
+    assert persisted_decisions(tmp_path) == ["ALLOW"]
+
+
+@pytest.mark.parametrize("health", [
+    {"service": "demo-api", "status": "healthy", "reason": "ok"},
+    None,
+    DemoApiHealth.model_construct(service="other", status="healthy", reason="ok"),
+])
+def test_execute_rejects_unvalidated_adapter_output(tmp_path, execution_adapter, health):
+    execution_adapter.return_value = health
+    conn = prepared_audit_conn(tmp_path)
+    try:
+        result = execute_mock_health_read(
+            conn, create_local_run_context(), authorized_proposal()
+        )
+        assert result.status is MockHealthReadStatus.FAILED
+        assert result.decision is PolicyDecision.ALLOW
+        assert result.health is None
+        execution_adapter.assert_called_once_with()
+    finally:
+        conn.close()
 
 
 @patch("adaptive_agentops.gateway.evaluate_policy", wraps=evaluate_policy)

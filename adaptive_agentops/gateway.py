@@ -1,8 +1,10 @@
 from dataclasses import dataclass
+from enum import Enum
 from sqlite3 import Connection
 
 from adaptive_agentops.audit import append_policy_decision
 from adaptive_agentops.identity import RunContext
+from adaptive_agentops.mock_adapter import DemoApiHealth, get_demo_api_health
 from adaptive_agentops.policy import PolicyDecision, evaluate_policy
 from adaptive_agentops.tool_requests import MockGetHealthProposal
 
@@ -54,3 +56,45 @@ def evaluate_and_audit_preflight(
                 pass
         return fail_closed
     return preflight
+
+
+class MockHealthReadStatus(str, Enum):
+    NOT_DISPATCHED = "NOT_DISPATCHED"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
+@dataclass(frozen=True)
+class MockHealthReadResult:
+    status: MockHealthReadStatus
+    decision: PolicyDecision | None
+    health: DemoApiHealth | None = None
+
+
+def execute_mock_health_read(
+    conn: Connection,
+    context: object,
+    proposal: object,
+) -> MockHealthReadResult:
+    """Dispatch once after committed authorization; outcomes are not audited yet."""
+    preflight = evaluate_and_audit_preflight(conn, context, proposal)
+    # A successful audited preflight returns only after its transaction commits.
+    if preflight.error is not False or preflight.decision is not PolicyDecision.ALLOW:
+        return MockHealthReadResult(
+            status=MockHealthReadStatus.NOT_DISPATCHED, decision=preflight.decision
+        )
+
+    try:
+        health = get_demo_api_health()
+        if not isinstance(health, DemoApiHealth):
+            raise TypeError("Unexpected adapter result")
+        health = DemoApiHealth.model_validate(health.model_dump())
+    except Exception:
+        return MockHealthReadResult(
+            status=MockHealthReadStatus.FAILED, decision=preflight.decision
+        )
+    return MockHealthReadResult(
+        status=MockHealthReadStatus.SUCCEEDED,
+        decision=preflight.decision,
+        health=health,
+    )

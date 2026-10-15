@@ -3,9 +3,12 @@
 RunContext is a local trusted fixture, not cryptographic workload authentication.
 A RESERVED outcome confirms database durability, not mutation execution. An
 UNCERTAIN commit requires reconciliation; a stored reservation is not retry permission.
-Rollback failure also returns UNCERTAIN and attempts to close the owned connection.
+For ordinary errors, rollback failure returns UNCERTAIN and attempts to close
+the owned connection.
 If closing itself fails, invalidation cannot be guaranteed: the caller must discard
-the connection and must not commit or reuse it.
+the connection and must not commit or reuse it. Interruption exceptions propagate
+after owned-transaction cleanup. An interruption during COMMIT does not establish
+whether it committed; never infer dispatch permission or retry from that exception.
 """
 
 from dataclasses import dataclass
@@ -100,17 +103,24 @@ def reserve_approved_restart(
         conn.commit()
         owned = False
         return ReservationResult(ReservationStatus.RESERVED, reservation)
-    except Exception:
+    except BaseException as error:
+        interruption = error if not isinstance(error, Exception) else None
+        rollback_failed = False
         if owned:
             try:
                 conn.rollback()
-            except Exception:
+            except BaseException as cleanup_error:
+                rollback_failed = True
+                if interruption is None and not isinstance(cleanup_error, Exception):
+                    interruption = cleanup_error
                 # Do not leave partial writes available for a later caller commit.
                 try:
                     conn.close()
-                except Exception:
-                    # UNCERTAIN does not assert successful connection isolation.
-                    pass
-                return ReservationResult(ReservationStatus.UNCERTAIN)
-        status = ReservationStatus.UNCERTAIN if commit_attempted else ReservationStatus.NOT_RESERVED
+                except BaseException as close_error:
+                    # Isolation is unconfirmed; caller must permanently discard.
+                    if interruption is None and not isinstance(close_error, Exception):
+                        interruption = close_error
+        if interruption is not None:
+            raise interruption
+        status = ReservationStatus.UNCERTAIN if commit_attempted or rollback_failed else ReservationStatus.NOT_RESERVED
         return ReservationResult(status)

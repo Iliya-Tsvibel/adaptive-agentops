@@ -334,3 +334,59 @@ def test_invalid_inputs_do_not_dispatch(db, adapter, bad_context):
     assert result.status is Status.NOT_DISPATCHED
     assert snapshot(conn) == (0, 0, 0)
     adapter.assert_not_called()
+
+
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+@pytest.mark.parametrize("phase", ["consumption", "reservation", "audit", "commit", "ambiguous"])
+def test_interrupted_reservation_never_reaches_adapter(db, adapter, error_type, phase):
+    approve(db)
+    observer, path, _, _ = db
+    interruption = error_type("reservation interrupted")
+
+    class InterruptedReservation(sqlite3.Connection):
+        begins = 0
+        commits = 0
+        rollbacks = 0
+
+        def execute(self, sql, parameters=()):
+            if sql == "BEGIN IMMEDIATE":
+                self.begins += 1
+            cursor = super().execute(sql, parameters)
+            marker = {
+                "consumption": "UPDATE approvals SET consumed=1",
+                "reservation": "INSERT INTO dispatch_reservations",
+                "audit": "INSERT INTO audit_events",
+            }.get(phase)
+            if marker and marker in sql:
+                raise interruption
+            return cursor
+
+        def commit(self):
+            self.commits += 1
+            if phase == "ambiguous":
+                super().commit()
+            raise interruption
+
+        def rollback(self):
+            self.rollbacks += 1
+            super().rollback()
+
+    conn = sqlite3.connect(path, factory=InterruptedReservation)
+    try:
+        with pytest.raises(error_type) as caught:
+            invoke(db, conn)
+        assert caught.value is interruption
+        adapter.assert_not_called()
+        assert conn.begins == conn.rollbacks == 1
+        assert conn.commits == int(phase in ("commit", "ambiguous"))
+        assert not conn.in_transaction
+        expected = (1, 1, 1) if phase == "ambiguous" else (0, 0, 0)
+        assert snapshot(observer) == expected
+        sqlite3.Connection.commit(conn)
+        assert snapshot(observer) == expected
+        if phase == "ambiguous":
+            # A new explicit controller call cannot turn stored state into POST rights.
+            assert invoke(db).status is Status.NOT_DISPATCHED
+            adapter.assert_not_called()
+    finally:
+        conn.close()

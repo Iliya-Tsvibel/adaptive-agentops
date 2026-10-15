@@ -1,3 +1,4 @@
+import asyncio
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError, replace
@@ -53,10 +54,13 @@ def db(tmp_path):
 def no_adapter():
     with patch("adaptive_agentops.mock_adapter.get_demo_api_health") as adapter, patch(
         "adaptive_agentops.gateway.get_demo_api_health"
-    ) as gateway_adapter:
+    ) as gateway_adapter, patch(
+        "adaptive_agentops.mock_restart_adapter.request_demo_api_restart"
+    ) as restart_adapter:
         yield
         adapter.assert_not_called()
         gateway_adapter.assert_not_called()
+        restart_adapter.assert_not_called()
 
 
 def state(conn):
@@ -431,3 +435,134 @@ def test_audit_insert_then_rollback_failure_is_uncertain(db, fail_close):
         # Test cleanup bypasses the deliberately failing close override.
         sqlite3.Connection.close(conn)
     assert state(observer) == (0, 0, 0)
+
+
+class InterruptedConnection(ObservedConnection):
+    phase = None
+    interruption = None
+    cleanup_error = None
+    close_error = None
+    interrupted_state = None
+
+    def execute(self, sql, parameters=()):
+        cursor = super().execute(sql, parameters)
+        marker = {
+            "consumption": "UPDATE approvals SET consumed=1",
+            "reservation": "INSERT INTO dispatch_reservations",
+            "audit": "INSERT INTO audit_events",
+        }.get(self.phase)
+        if marker and marker in sql:
+            self.interrupted_state = state(self)
+            raise self.interruption
+        return cursor
+
+    def commit(self):
+        if self.phase in ("commit", "ambiguous"):
+            self.commits += 1
+            self.interrupted_state = state(self)
+            if self.phase == "ambiguous":
+                sqlite3.Connection.commit(self)
+            raise self.interruption
+        super().commit()
+
+    def rollback(self):
+        if self.cleanup_error is not None:
+            self.rollbacks += 1
+            raise self.cleanup_error
+        super().rollback()
+
+    def close(self):
+        if self.close_error is not None:
+            self.closes += 1
+            raise self.close_error
+        super().close()
+
+
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+@pytest.mark.parametrize("phase", ["consumption", "reservation", "audit", "commit", "ambiguous"])
+def test_interruption_cleans_owned_transaction_before_propagation(db, error_type, phase):
+    observer, path, context, action, _ = db
+    conn = sqlite3.connect(path, factory=InterruptedConnection)
+    conn.phase, conn.interruption = phase, error_type("interrupted")
+    try:
+        with pytest.raises(error_type) as caught:
+            reserve_approved_restart(conn, context, action.action_id)
+        assert caught.value is conn.interruption
+        assert conn.interrupted_state == {
+            "consumption": (1, 0, 0), "reservation": (1, 1, 0),
+            "audit": (1, 1, 1), "commit": (1, 1, 1), "ambiguous": (1, 1, 1),
+        }[phase]
+        assert conn.begins == conn.rollbacks == 1
+        assert conn.commits == int(phase in ("commit", "ambiguous"))
+        assert conn.closes == 0 and not conn.in_transaction
+        expected = (1, 1, 1) if phase == "ambiguous" else (0, 0, 0)
+        assert state(observer) == state(conn) == expected
+        # Check BEFORE closing: later caller COMMIT cannot resurrect rolled-back writes.
+        sqlite3.Connection.commit(conn)
+        assert state(observer) == expected
+    finally:
+        sqlite3.Connection.close(conn)
+
+
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+@pytest.mark.parametrize("fail_close", [False, True])
+def test_interruption_with_cleanup_failure(db, error_type, fail_close):
+    observer, path, context, action, _ = db
+    conn = sqlite3.connect(path, factory=InterruptedConnection)
+    conn.phase, conn.interruption = "reservation", error_type("interrupted")
+    conn.cleanup_error = sqlite3.OperationalError("rollback failed")
+    if fail_close:
+        conn.close_error = sqlite3.OperationalError("close failed")
+    try:
+        with pytest.raises(error_type) as caught:
+            reserve_approved_restart(conn, context, action.action_id)
+        assert caught.value is conn.interruption
+        assert conn.interrupted_state == (1, 1, 0)
+        assert conn.begins == conn.rollbacks == conn.closes == 1
+        assert conn.commits == 0 and state(observer) == (0, 0, 0)
+        if fail_close:
+            # Isolation cannot be claimed. Permanently discard; never commit.
+            assert conn.in_transaction and state(conn) == (1, 1, 0)
+        else:
+            with pytest.raises(sqlite3.ProgrammingError):
+                sqlite3.Connection.commit(conn)
+            with pytest.raises(sqlite3.ProgrammingError):
+                conn.execute("SELECT 1")
+        assert state(observer) == (0, 0, 0)
+    finally:
+        sqlite3.Connection.close(conn)
+
+
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+def test_interruption_during_rollback_still_closes_and_propagates(db, error_type):
+    observer, path, context, action, _ = db
+    conn = sqlite3.connect(path, factory=InterruptedConnection)
+    conn.phase, conn.interruption = "reservation", ValueError("ordinary failure")
+    conn.cleanup_error = error_type("cleanup interrupted")
+    try:
+        with pytest.raises(error_type) as caught:
+            reserve_approved_restart(conn, context, action.action_id)
+        assert caught.value is conn.cleanup_error
+        assert conn.rollbacks == conn.closes == 1
+        with pytest.raises(sqlite3.ProgrammingError):
+            sqlite3.Connection.commit(conn)
+        assert state(observer) == (0, 0, 0)
+    finally:
+        sqlite3.Connection.close(conn)
+
+
+def test_interruption_faults_do_not_touch_caller_transaction(db):
+    observer, path, context, action, _ = db
+    conn = sqlite3.connect(path, factory=InterruptedConnection)
+    conn.phase, conn.interruption = "reservation", KeyboardInterrupt()
+    try:
+        conn.execute("BEGIN")
+        conn.execute("UPDATE actions SET resource='caller-marker'")
+        result = reserve_approved_restart(conn, context, action.action_id)
+        assert result.status is ReservationStatus.NOT_RESERVED
+        assert conn.in_transaction
+        assert conn.begins == conn.commits == conn.rollbacks == conn.closes == 0
+        assert conn.execute("SELECT resource FROM actions").fetchone()[0] == "caller-marker"
+        assert state(observer) == (0, 0, 0)
+    finally:
+        sqlite3.Connection.close(conn)

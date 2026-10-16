@@ -1,29 +1,102 @@
 # Adaptive AgentOps
 
-Secure AI Agent Control Plane
+Adaptive AgentOps is a Secure AI Agent Control Plane project.
+Its flagship direction is controlled agent tool execution: proposals pass through deterministic policy, scoped approval where required, and audited execution.
 
-## Current Stage
+Stage 2 implements a local security MVP in Python and FastAPI, without an LLM or agent runtime.
+It supports a read-only mock health check and an approval-gated simulated restart of `demo-api`.
 
-Stage 2 — Deterministic Security Vertical Slice
+## Implemented architecture
 
-Python / FastAPI, without LLM.
+| Component | Responsibility |
+| --- | --- |
+| `identity.py`, `tool_requests.py` | Trusted local `RunContext` and restricted, typed proposals with empty arguments |
+| `policy.py` | Default-deny policy decision point (PDP): allow health reads, require approval for restarts in the fixed local scope |
+| `gateway.py`, `restart_gateway.py` | Policy enforcement: audit authorization before a health read; atomically create a pending restart and policy evidence |
+| `actions.py`, `approvals.py`, `operator_cli.py` | Fingerprinted, expiring actions and local operator review and decision persistence |
+| `dispatch_reservations.py`, `dispatch_control.py` | Atomic approval consumption, unique dispatch reservation, and pre-dispatch audit |
+| `execution_controller.py` | Reserve, attempt the mock restart once, then commit its result separately |
+| `audit.py` | Correlated SQLite policy, reservation, and result events |
+| `mock_adapter.py`, `mock_restart_adapter.py`, `mock_api.py` | Fixed loopback HTTP adapters and simulated target |
 
-## Objective
+`main.py` exposes only `GET /health`; it is not an HTTP execution or approval service.
+The workflow uses internal Python entry points and a local operator CLI.
+SQLite stores `actions`, `approvals`, `dispatch_reservations`, and `audit_events`.
 
-Demonstrate controlled tool execution through:
+## Audited restart lifecycle
 
-Request → Identity → Policy (PEP/PDP) → Tool Gateway → Audit
+1. Trusted code supplies a `RunContext` and a `mock.restart_service` proposal for `demo-api` with `{}` arguments.
+2. `create_audited_pending_restart` evaluates policy. For `APPROVAL_REQUIRED`, it commits a server-generated action, scope fingerprint, ten-minute expiry, and `POLICY_DECISION` together. A valid denied request records denial without creating an action.
+3. The operator reviews persisted scope and enters an explicit approval or rejection in the CLI. The decision binds to that action and expires with it; recording approval does not execute anything.
+4. `execute_approved_mock_restart` calls `reserve_approved_restart`. Under `BEGIN IMMEDIATE`, it validates context, action, approval, expiry, and fresh policy, then atomically consumes approval, inserts a unique reservation, and records `DISPATCH_RESERVED`.
+5. Only a confirmed reservation commit permits one adapter invocation. HTTP runs outside the SQLite write transaction: one empty POST to the fixed mock restart endpoint, without retries or redirects.
+6. A separate transaction commits `RESULT`, correlated by run, action, approval, and dispatch IDs. `ACKNOWLEDGED` confirms a simulated response; `UNCERTAIN` leaves the external outcome unresolved. An unconfirmed result commit returns `AUDIT_UNCONFIRMED`. Stored reservations never grant resume or retry rights.
 
-## Security Principles
+The read-only Gateway commits `POLICY_DECISION` before GET; failure to confirm that commit prevents dispatch.
+It commits a separate `RESULT` afterward.
+A subsequent `RESULT` audit failure leaves result durability unconfirmed but does not erase the already committed `ALLOW` decision or undo the HTTP attempt.
 
-- Default deny
-- Complete mediation
-- Fail-closed authorization
-- Immutable action scope
-- Atomic approval consumption
-- No automatic mutation retries
+## Local setup and tests
 
-## Status
+Use Python 3.12 or newer, from the repository root:
 
-Initial repository bootstrap.
-Implementation not started.
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install '.[dev]'
+python -m pytest -q
+```
+
+The `dev` extra is needed for this local workflow: it includes HTTPX (used by the adapters) and pytest.
+FastAPI and Uvicorn are base dependencies; Pydantic is supplied through FastAPI.
+Versions use lower bounds rather than a lockfile.
+
+Run tests sequentially.
+The real loopback integration tests require exclusive use of `127.0.0.1:8001` and start and stop their own mock server.
+Stop any manually started mock server before testing.
+To run just that module:
+
+```bash
+python -m pytest -q tests/test_restart_e2e.py
+```
+
+Optional local servers, each in its own terminal with the environment activated:
+
+```bash
+python -m uvicorn adaptive_agentops.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn adaptive_agentops.mock_api:app --host 127.0.0.1 --port 8001
+```
+
+The CLI requires an existing initialized, file-backed database and a committed pending action.
+Replace the example path and UUID with those supplied by trusted integration code:
+
+```bash
+python -m adaptive_agentops.operator_cli --db /path/to/existing.db review ACTION_UUID
+python -m adaptive_agentops.operator_cli --db /path/to/existing.db decide ACTION_UUID
+```
+
+`decide` requires interactive stdin and stdout and exact `APPROVE ACTION_UUID` or `REJECT ACTION_UUID` confirmation.
+There is no database bootstrap or execution CLI.
+See [the end-to-end test](tests/test_restart_e2e.py) for schema initialization and complete internal API wiring; its terminal interaction is simulated.
+
+## CI and evidence
+
+[GitHub Actions](.github/workflows/ci.yml) runs on pushes and pull requests to `main`, on Ubuntu with Python 3.12.
+It installs `.[dev]` and runs `python -m pytest -q` sequentially, with a ten-minute job timeout, read-only repository permissions, SHA-pinned actions, and checkout credential persistence disabled.
+
+Tests exercise policy rejection, malformed inputs, expiry, scope binding, competing reservations, replay prevention, transaction and audit failures, interruptions, adapter limits, and the real loopback restart workflow.
+This demonstrates local authorization and persistence ordering under tested conditions.
+It does not prove production security, authenticated workloads or humans, exactly-once external effects, or real service recovery.
+
+## Boundaries and future direction
+
+The MVP assumes trusted local code, operators, host, clock, and intact SQLite storage.
+The mock API is unauthenticated and accepts direct POSTs outside the controller.
+Audit and action tables are neither tamper-proof nor generally append-only.
+See [Stage 2 security boundaries](docs/stage2-security.md) for the full contract and failure semantics.
+
+Future agent integration would submit proposals through these control points while keeping identity, approval, and execution authority outside agent-supplied input.
+Agent and LLM integration, real workload and operator authentication, protected targets, and production infrastructure adapters are deferred, not implemented features.
+
+This documentation is based on repository code, tests, dependencies, and CI at starting commit `9f765fb`.
+Canonical MasterBrief and PRD sources are not present in the local repository; alignment with their full contents could not be verified.

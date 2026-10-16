@@ -1,3 +1,4 @@
+import asyncio
 import sqlite3
 from dataclasses import FrozenInstanceError
 from pathlib import Path
@@ -549,7 +550,11 @@ def test_result_audit_failure_is_not_retried(
         assert conn.commit_calls == (1 if failure in ("commit", "rollback") else 0)
         owned = failure in ("insert", "commit", "rollback")
         assert conn.rollback_calls == int(owned)
-        assert conn.in_transaction is (failure in ("rollback", "foreign_transaction"))
+        if failure == "rollback":
+            with pytest.raises(sqlite3.ProgrammingError):
+                sqlite3.Connection.commit(conn)
+        else:
+            assert conn.in_transaction is (failure == "foreign_transaction")
         if owned:
             expected = ExecutionStatus.FAILED if adapter_fails else ExecutionStatus.SUCCEEDED
             result_append.assert_called_once_with(conn, context, proposal, expected)
@@ -689,3 +694,220 @@ def test_active_caller_transaction_is_left_untouched(tmp_path: Path) -> None:
         conn.close()
 
     assert persisted_decisions(tmp_path) == []
+
+
+class AuditCleanupConnection(sqlite3.Connection):
+    target = None
+    stage = None
+    error = None
+    rollback_error = None
+    close_error = None
+    current_kind = None
+    writes = 0
+    commits = 0
+    rollbacks = 0
+    closes = 0
+
+    def execute(self, sql, parameters=()):
+        cursor = super().execute(sql, parameters)
+        if "INSERT INTO audit_events" in sql:
+            self.current_kind = parameters[2]
+            self.writes += 1
+            if self.current_kind == self.target and self.stage == "insert":
+                raise self.error  # Real row exists in the owned transaction.
+        return cursor
+
+    def commit(self):
+        self.commits += 1
+        if self.current_kind == self.target and self.stage in ("commit", "ambiguous"):
+            if self.stage == "ambiguous":
+                super().commit()
+            raise self.error
+        super().commit()
+
+    def rollback(self):
+        self.rollbacks += 1
+        if self.rollback_error is not None:
+            raise self.rollback_error
+        super().rollback()
+
+    def close(self):
+        self.closes += 1
+        if self.close_error is not None:
+            raise self.close_error
+        super().close()
+
+
+def audit_kinds(conn):
+    return [row[0] for row in conn.execute("SELECT event_kind FROM audit_events ORDER BY rowid")]
+
+
+@pytest.mark.parametrize("target", ["POLICY_DECISION", "RESULT"])
+@pytest.mark.parametrize("stage", ["insert", "commit", "ambiguous"])
+@pytest.mark.parametrize("error_type", [sqlite3.OperationalError, KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+def test_audit_errors_and_interruptions_clean_owned_work(
+    tmp_path, execution_adapter, target, stage, error_type,
+):
+    conn = sqlite3.connect(tmp_path / "audit.db", factory=AuditCleanupConnection)
+    observer = sqlite3.connect(tmp_path / "audit.db")
+    initialize_audit_schema(conn)
+    conn.target, conn.stage, conn.error = target, stage, error_type("SECRET_FAULT")
+    try:
+        if issubclass(error_type, Exception):
+            result = execute_mock_health_read(conn, create_local_run_context(), authorized_proposal())
+            assert result.status is (
+                MockHealthReadStatus.NOT_DISPATCHED if target == "POLICY_DECISION"
+                else MockHealthReadStatus.AUDIT_FAILED
+            )
+            assert result.decision is (None if target == "POLICY_DECISION" else PolicyDecision.ALLOW)
+            assert result.health is None and "SECRET" not in repr(result)
+        else:
+            with pytest.raises(error_type) as caught:
+                execute_mock_health_read(conn, create_local_run_context(), authorized_proposal())
+            assert caught.value is conn.error
+        assert execution_adapter.call_count == int(target == "RESULT")
+        assert conn.writes == (1 if target == "POLICY_DECISION" else 2)
+        assert conn.commits == int(target == "RESULT") + int(stage != "insert")
+        assert conn.rollbacks == 1 and conn.closes == 0
+        assert not conn.in_transaction
+        expected = [] if target == "POLICY_DECISION" else ["POLICY_DECISION"]
+        if stage == "ambiguous":
+            expected.append(target)
+        assert audit_kinds(observer) == expected
+        # Assert safety before teardown: a later COMMIT cannot restore partial rows.
+        sqlite3.Connection.commit(conn)
+        assert audit_kinds(observer) == expected
+    finally:
+        sqlite3.Connection.close(conn)
+        observer.close()
+
+
+@pytest.mark.parametrize("target", ["POLICY_DECISION", "RESULT"])
+@pytest.mark.parametrize("fail_close", [False, True])
+@pytest.mark.parametrize("error_type", [sqlite3.OperationalError, KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+def test_audit_rollback_failure_invalidates_or_requires_discard(
+    tmp_path, execution_adapter, target, fail_close, error_type,
+):
+    conn = sqlite3.connect(tmp_path / "audit.db", factory=AuditCleanupConnection)
+    observer = sqlite3.connect(tmp_path / "audit.db")
+    initialize_audit_schema(conn)
+    conn.target, conn.stage, conn.error = target, "insert", error_type("SECRET_FAULT")
+    conn.rollback_error = sqlite3.OperationalError("SECRET_ROLLBACK")
+    if fail_close:
+        conn.close_error = sqlite3.OperationalError("SECRET_CLOSE")
+    try:
+        if issubclass(error_type, Exception):
+            result = execute_mock_health_read(conn, create_local_run_context(), authorized_proposal())
+            assert result.status is (
+                MockHealthReadStatus.NOT_DISPATCHED if target == "POLICY_DECISION"
+                else MockHealthReadStatus.AUDIT_FAILED
+            )
+            assert result.health is None and "SECRET" not in repr(result)
+        else:
+            with pytest.raises(error_type) as caught:
+                execute_mock_health_read(conn, create_local_run_context(), authorized_proposal())
+            assert caught.value is conn.error
+        assert execution_adapter.call_count == int(target == "RESULT")
+        assert conn.writes == (1 if target == "POLICY_DECISION" else 2)
+        assert conn.commits == int(target == "RESULT")
+        assert conn.rollbacks == conn.closes == 1
+        if fail_close:
+            # Explicit unresolved state; caller must permanently discard, never commit.
+            assert conn.in_transaction
+            assert audit_kinds(conn)[-1] == target
+        else:
+            with pytest.raises(sqlite3.ProgrammingError):
+                sqlite3.Connection.commit(conn)
+            with pytest.raises(sqlite3.ProgrammingError):
+                conn.execute("SELECT 1")
+        assert audit_kinds(observer) == ([] if target == "POLICY_DECISION" else ["POLICY_DECISION"])
+    finally:
+        sqlite3.Connection.close(conn)  # Only after asserting actual cleanup outcome.
+        observer.close()
+
+
+@pytest.mark.parametrize("during_read", [False, True])
+def test_cleanup_never_touches_caller_owned_transaction(tmp_path, execution_adapter, during_read):
+    conn = sqlite3.connect(tmp_path / "audit.db", factory=AuditCleanupConnection)
+    initialize_audit_schema(conn)
+    conn.rollback_error = AssertionError("Caller transaction rolled back")
+    conn.close_error = AssertionError("Caller connection closed")
+    health = execution_adapter.return_value
+    def read():
+        conn.execute("BEGIN")
+        return health
+    if during_read:
+        execution_adapter.side_effect = read
+    else:
+        conn.execute("BEGIN")
+    try:
+        result = execute_mock_health_read(conn, create_local_run_context(), authorized_proposal())
+        assert result.status is (MockHealthReadStatus.AUDIT_FAILED if during_read else MockHealthReadStatus.NOT_DISPATCHED)
+        assert conn.in_transaction
+        assert conn.rollbacks == conn.closes == 0
+        assert conn.commits == int(during_read)
+        assert execution_adapter.call_count == int(during_read)
+    finally:
+        sqlite3.Connection.close(conn)
+
+
+@pytest.mark.parametrize("target", ["POLICY_DECISION", "RESULT"])
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+def test_interruption_during_audit_rollback_still_closes(tmp_path, execution_adapter, target, error_type):
+    conn = sqlite3.connect(tmp_path / "audit.db", factory=AuditCleanupConnection)
+    initialize_audit_schema(conn)
+    conn.target, conn.stage, conn.error = target, "insert", ValueError("audit failure")
+    conn.rollback_error = error_type("cleanup interrupted")
+    try:
+        with pytest.raises(error_type) as caught:
+            execute_mock_health_read(conn, create_local_run_context(), authorized_proposal())
+        assert caught.value is conn.rollback_error
+        assert conn.rollbacks == conn.closes == 1
+        assert execution_adapter.call_count == int(target == "RESULT")
+        with pytest.raises(sqlite3.ProgrammingError):
+            sqlite3.Connection.commit(conn)
+        # RESULT cleanup must preserve the authorization committed before dispatch.
+        assert persisted_decisions(tmp_path) == ([] if target == "POLICY_DECISION" else ["ALLOW"])
+        observer = sqlite3.connect(tmp_path / "audit.db")
+        try:
+            assert audit_kinds(observer) == ([] if target == "POLICY_DECISION" else ["POLICY_DECISION"])
+        finally:
+            observer.close()
+    finally:
+        sqlite3.Connection.close(conn)
+
+
+@pytest.mark.parametrize("target", ["POLICY_DECISION", "RESULT"])
+@pytest.mark.parametrize("interruption_source", ["audit", "rollback", "close"])
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit, asyncio.CancelledError])
+def test_close_interruption_preserves_first_interruption(
+    tmp_path, execution_adapter, target, interruption_source, error_type,
+):
+    conn = sqlite3.connect(tmp_path / "audit.db", factory=AuditCleanupConnection)
+    observer = sqlite3.connect(tmp_path / "audit.db")
+    initialize_audit_schema(conn)
+    conn.target, conn.stage = target, "insert"
+    conn.error = error_type("audit interrupted") if interruption_source == "audit" else ValueError("audit failed")
+    conn.rollback_error = (
+        error_type("rollback interrupted") if interruption_source == "rollback"
+        else sqlite3.OperationalError("rollback failed")
+    )
+    conn.close_error = error_type("close interrupted")
+    expected_error = {
+        "audit": conn.error, "rollback": conn.rollback_error, "close": conn.close_error,
+    }[interruption_source]
+    try:
+        with pytest.raises(error_type) as caught:
+            execute_mock_health_read(conn, create_local_run_context(), authorized_proposal())
+        assert caught.value is expected_error
+        assert conn.rollbacks == conn.closes == 1
+        assert conn.writes == (1 if target == "POLICY_DECISION" else 2)
+        assert conn.commits == int(target == "RESULT")
+        assert execution_adapter.call_count == int(target == "RESULT")
+        # Both cleanup operations failed: isolation is unresolved, so never commit.
+        assert conn.in_transaction
+        assert audit_kinds(conn)[-1] == target
+        assert audit_kinds(observer) == ([] if target == "POLICY_DECISION" else ["POLICY_DECISION"])
+    finally:
+        sqlite3.Connection.close(conn)
+        observer.close()

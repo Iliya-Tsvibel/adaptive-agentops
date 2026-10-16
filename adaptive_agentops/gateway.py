@@ -1,3 +1,13 @@
+"""Read-only Gateway; audit failure never confirms authorization or durability.
+
+Owned transactions are rolled back on failure, including interruptions. Failed
+rollback triggers connection close. If close also fails, isolation is unconfirmed:
+the caller must permanently discard the connection, never commit or reuse it.
+Failure outcomes do not promise connection usability. Interrupted/ambiguous COMMIT
+may have persisted evidence but never authorizes dispatch or confirms a RESULT.
+POLICY_DECISION commits before dispatch; RESULT cleanup preserves that evidence.
+"""
+
 from dataclasses import dataclass
 from enum import Enum
 from sqlite3 import Connection
@@ -11,6 +21,25 @@ from adaptive_agentops.identity import RunContext
 from adaptive_agentops.mock_adapter import DemoApiHealth, get_demo_api_health
 from adaptive_agentops.policy import PolicyDecision, evaluate_policy
 from adaptive_agentops.tool_requests import MockGetHealthProposal
+
+
+def _cleanup_audit_failure(conn: Connection, owned: bool, error: BaseException) -> None:
+    """Clean only Gateway-owned work; propagate the first interruption encountered."""
+    interruption = error if not isinstance(error, Exception) else None
+    if owned:
+        try:
+            conn.rollback()
+        except BaseException as cleanup_error:
+            if interruption is None and not isinstance(cleanup_error, Exception):
+                interruption = cleanup_error
+            try:
+                conn.close()
+            except BaseException as close_error:
+                # Caller must discard: closing was attempted, not confirmed.
+                if interruption is None and not isinstance(close_error, Exception):
+                    interruption = close_error
+    if interruption is not None:
+        raise interruption
 
 
 @dataclass(frozen=True)
@@ -52,12 +81,8 @@ def evaluate_and_audit_preflight(
         transaction_started = True
         append_policy_decision(conn, context, proposal, preflight.decision)
         conn.commit()
-    except Exception:
-        if transaction_started:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
+    except BaseException as error:
+        _cleanup_audit_failure(conn, transaction_started, error)
         return fail_closed
     return preflight
 
@@ -110,12 +135,8 @@ def execute_mock_health_read(
         transaction_started = True
         append_mock_health_result(conn, context, proposal, status)
         conn.commit()
-    except Exception:
-        if transaction_started:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
+    except BaseException as error:
+        _cleanup_audit_failure(conn, transaction_started, error)
         return MockHealthReadResult(
             status=MockHealthReadStatus.AUDIT_FAILED, decision=preflight.decision
         )

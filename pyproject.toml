@@ -11,7 +11,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8",
+    # Temporary pin: monkeypatch teardown regression (https://github.com/pytest-dev/pytest/issues/15099).
+    "pytest==9.1.1",
     "httpx>=0.27",
 ]
 

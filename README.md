@@ -230,9 +230,23 @@ energy; zero additional spend means no paid APIs, services or purchases.
 
 ## Stage 3 evaluation and acceptance
 
-Stage 3 status is **EVALUATION PENDING**, with **production NO-GO**. See the
-[acceptance report](docs/stage3-acceptance.md) for reused security evidence,
-assumptions, frozen thresholds, methodology and pending model-quality results.
+Stage 3 is **LOCAL MVP ACCEPTED / PRODUCTION NO-GO**, based on the completed
+local evaluation and supplied independent review. See the [final acceptance
+report](docs/stage3-acceptance.md) and [exact archived evidence](evaluations/stage3_results.json).
+The unchanged manifest records 26/26 completed scenarios, 24/24 correct decisions,
+zero false positive restarts, false negatives or injection overrides, and 2/2
+boundary rejections. The source SQLite snapshots match nine pending actions,
+61 correlated audit events, and zero approvals or reservations. All 11 reviewed
+gate groups passed (12 individual manifest flags, with category minima separate).
+
+Preparation latency was p50 **0.671212 s**, p95 **0.807475 s**, maximum
+**8.713817 s**. The nearest-rank p95 is the 23rd of 24 ordered samples: its value
+excludes the 8.714-second cold-start maximum, which remains in the sample set.
+This is one run on 24 curated decision scenarios; the dataset is now consumed
+holdout evidence. There is no independent attestation of model weights or GPU
+usage, authenticated production workload/operator identity, protected real target,
+tamper-proof audit, or production reliability/recovery claim. Zero additional paid
+services or API usage is reported, not independently billed-audited.
 The 26 frozen synthetic cases contain 24 decisions (9 restart, 15 NO_ACTION) and
 two input-boundary rejections. Expected labels are not sent to the model.
 
@@ -246,10 +260,11 @@ This validates the frozen dataset and prints its hash/counts. It makes no health
 or inference request and writes no results/database. New evaluator tests use
 mocked transports exclusively. Existing owned-localhost E2E tests are unchanged.
 
-**Do not run live evaluation yet.** It requires separate explicit authorization
-and a reviewed launch plan providing local-only daemon configuration and egress
-protection for both evaluator and daemon. The previously prepared egress guard
-launches only one smoke script; it cannot be assumed to run this evaluation.
+**Do not rerun the accepted evaluation automatically.** Any additional live run
+requires fresh explicit authorization and a reviewed launch plan providing
+local-only daemon configuration and egress protection for evaluator and daemon.
+The previously prepared smoke egress guard launches only one smoke script; it
+cannot be assumed to run this evaluation.
 The confirmation flag below is an operator attestation, not firewall enforcement.
 No missing prerequisite permits a model download, install, cloud fallback or API
 credential. No firewall settings are changed by the evaluator.
@@ -281,10 +296,12 @@ for a new run. SIGKILL/storage failure can leave incomplete RUNNING/STARTED evid
 
 Exit 0 means validation succeeded or all evaluation gates passed; exit 1 means a
 completed failed evaluation or an aborted run; exit 2 means refusal/input/output
-failure. Even a passing run leaves Stage 3 **EVALUATION PENDING** until independent
-review. Do not relabel cases, alter accepted prompts, or relax gates to improve
-scores. Local inference does not prove production readiness, daemon provenance,
-full-context processing or universal prompt-injection immunity.
+failure. A later passing run does not automatically establish new acceptance;
+it still requires independent review. The archived run and supplied review support
+the current **LOCAL MVP ACCEPTED** decision. Do not relabel cases, alter accepted
+prompts, or relax gates to improve scores. Local inference does not prove
+production readiness, daemon provenance, full-context processing or universal
+prompt-injection immunity.
 
 ## CI and evidence
 

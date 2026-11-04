@@ -124,6 +124,110 @@ is outside this offline path; this is not a repository-wide network prohibition.
 Parser failures and NO_ACTION return statuses without inventing execution audit
 events; existing policy/result evidence and approval records retain their scope.
 
+## Local Ollama preparation (Stage 3)
+
+`prepare_local_agent_action(conn, context, *, allow_local_inference=False)` in
+`adaptive_agentops.local_agent_workflow` is a separate trusted integration path.
+Only the literal `True` enables any work, including health reads and audit writes.
+It uses the existing health Gateway, validates its actual result through
+`build_agent_observation()`, makes one bounded local inference request, parses
+its exact content through `parse_agent_proposal()`, and sends only valid proposals
+to the existing restart Gateway/PDP. It stops at committed pending-action creation.
+The offline workflow and existing OpenAI adapter are unchanged and are not called.
+
+The fixed endpoint is `http://127.0.0.1:11434/api/chat`, with the already installed
+`qwen3.5:2b-q4_K_M` model. Requests set `think=false`, `stream=false`,
+`temperature=0`, `num_ctx=2048`, `num_predict=128`, and a JSON Schema allowing
+exactly one `decision`: `NO_ACTION` or `PROPOSE_RESTART`. Trusted system
+instructions are separate from the JSON observation; `reason` is untrusted data.
+There are no tools, conversation history, credentials, dynamic destinations,
+model overrides, automatic retries, downloads, or cloud fallback.
+
+Requests are capped at 16 KiB and raw responses at 32 KiB. A conservative 1 KiB
+UTF-8 serialized-observation cap leaves context headroom; larger observations are
+rejected, never truncated. This is not a tokenizer-based guarantee that the
+2,048-token context contains the entire prompt or that the daemon processed it
+fully. The adapter requires a completed assistant response from the expected
+model with `done=true` and `done_reason="stop"`. It rejects malformed envelopes,
+nonempty thinking, tool calls, unexpected fields, compression, and non-JSON
+responses. Documented optional timestamp/statistics fields are type-checked but
+never confer authority. The existing strict proposal parser remains mandatory.
+
+HTTPX uses no environment proxies, redirects, or transport retries. Connection
+timeout is two seconds; read/write/pool operations are bounded at twenty seconds;
+a thirty-second cooperative async deadline covers the request and response.
+Cancellation propagates after transport cleanup. Timeout/cancellation can leave
+local inference running, and never authorizes an automatic retry.
+
+Results distinguish disabled operation, unusable health, bounded adapter errors,
+NO_ACTION, INVALID_OUTPUT, and pending creation/not-creation/uncertainty. Only
+confirmed pending creation returns an action ID. Errors contain no raw prompt,
+reason, provider body, or exception text. Pending uncertainty may mean an action
+persisted; do not blindly repeat preparation. Separate invocations can create
+separate actions. Existing Gateway connection cleanup/discard rules still apply.
+Approval, reservation, execution and their audit mechanisms remain separate.
+
+### Manual experiment: explicit opt-in only
+
+Do not run inference as part of setup, import, tests, or application startup.
+For a separately approved manual experiment, use the existing installed model and
+mock API service at `127.0.0.1:8001`; do not install, pull, upgrade, or purchase
+anything. Configure the **daemon**, not just the client shell, for local-only
+operation (`OLLAMA_NO_CLOUD=1` or `disable_ollama_cloud: true`) and restrict external
+egress for both daemon and application. See [Ollama's local-only settings](https://docs.ollama.com/faq#how-do-i-disable-ollamas-cloud-features).
+If these prerequisites cannot be established, do not run the experiment.
+A missing model or unreachable fixed endpoint is a failure, not permission to
+pull a model, select another host, or use a cloud service.
+
+The following manual invocation creates a temporary file-backed database, makes
+one real local inference request at most, and stops before approval or dispatch.
+It retains the database for inspection and prints only bounded outcomes and IDs.
+Do not repeat it to force a desired model decision.
+
+```bash
+python - <<'PY_LOCAL'
+import asyncio
+from contextlib import closing
+from pathlib import Path
+import sqlite3
+import tempfile
+
+from adaptive_agentops.actions import initialize_action_schema
+from adaptive_agentops.approvals import initialize_approval_schema
+from adaptive_agentops.audit import initialize_audit_schema
+from adaptive_agentops.dispatch_reservations import initialize_dispatch_reservation_schema
+from adaptive_agentops.identity import create_local_run_context
+from adaptive_agentops.local_agent_workflow import prepare_local_agent_action
+
+path = Path(tempfile.mkdtemp(prefix="agentops-local-")) / "experiment.db"
+with closing(sqlite3.connect(path)) as conn:
+    for initialize in (initialize_action_schema, initialize_approval_schema,
+                       initialize_dispatch_reservation_schema, initialize_audit_schema):
+        initialize(conn)
+    conn.commit()
+    context = create_local_run_context()
+    result = asyncio.run(prepare_local_agent_action(
+        conn, context, allow_local_inference=True,
+    ))
+    print(result.status.value, result.action_id,
+          result.error.value if result.error else None)
+with closing(sqlite3.connect(path)) as observer:
+    for table in ("actions", "approvals", "dispatch_reservations", "audit_events"):
+        print(table, observer.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+print("Review database:", path)
+# STOP: no approval, reservation, or execution call.
+PY_LOCAL
+```
+
+All new automated tests use HTTPX MockTransport, reject unexpected requests,
+block sockets and OpenAI calls, and work without Ollama. No dependencies or paid
+services are needed. This client cannot prove daemon provenance, absence of daemon
+external egress, full prompt-injection immunity, production readiness, universal
+model reliability, or reproducibility merely from temperature zero. Model output
+is intent only: trusted context, PDP, human approval, atomic reservation and audit
+remain the authorization boundaries. Local inference uses existing hardware and
+energy; zero additional spend means no paid APIs, services or purchases.
+
 ## CI and evidence
 
 [GitHub Actions](.github/workflows/ci.yml) runs on pushes and pull requests to `main`, on Ubuntu with Python 3.12.

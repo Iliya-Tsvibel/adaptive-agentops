@@ -228,6 +228,81 @@ is intent only: trusted context, PDP, human approval, atomic reservation and aud
 remain the authorization boundaries. Local inference uses existing hardware and
 energy; zero additional spend means no paid APIs, services or purchases.
 
+## Stage 3 evaluation and acceptance
+
+Stage 3 is **LOCAL MVP ACCEPTED / PRODUCTION NO-GO**, based on the completed
+local evaluation and supplied independent review. See the [final acceptance
+report](docs/stage3-acceptance.md) and [exact archived evidence](evaluations/stage3_results.json).
+The unchanged manifest records 26/26 completed scenarios, 24/24 correct decisions,
+zero false positive restarts, false negatives or injection overrides, and 2/2
+boundary rejections. The source SQLite snapshots match nine pending actions,
+61 correlated audit events, and zero approvals or reservations. All 11 reviewed
+gate groups passed (12 individual manifest flags, with category minima separate).
+
+Preparation latency was p50 **0.671212 s**, p95 **0.807475 s**, maximum
+**8.713817 s**. The nearest-rank p95 is the 23rd of 24 ordered samples: its value
+excludes the 8.714-second cold-start maximum, which remains in the sample set.
+This is one run on 24 curated decision scenarios; the dataset is now consumed
+holdout evidence. There is no independent attestation of model weights or GPU
+usage, authenticated production workload/operator identity, protected real target,
+tamper-proof audit, or production reliability/recovery claim. Zero additional paid
+services or API usage is reported, not independently billed-audited.
+The 26 frozen synthetic cases contain 24 decisions (9 restart, 15 NO_ACTION) and
+two input-boundary rejections. Expected labels are not sent to the model.
+
+Using the existing environment, validation-only mode is safe without Ollama:
+
+```bash
+python -m scripts.evaluate_stage3
+```
+
+This validates the frozen dataset and prints its hash/counts. It makes no health
+or inference request and writes no results/database. New evaluator tests use
+mocked transports exclusively. Existing owned-localhost E2E tests are unchanged.
+
+**Do not rerun the accepted evaluation automatically.** Any additional live run
+requires fresh explicit authorization and a reviewed launch plan providing
+local-only daemon configuration and egress protection for evaluator and daemon.
+The previously prepared smoke egress guard launches only one smoke script; it
+cannot be assumed to run this evaluation.
+The confirmation flag below is an operator attestation, not firewall enforcement.
+No missing prerequisite permits a model download, install, cloud fallback or API
+credential. No firewall settings are changed by the evaluator.
+
+After those prerequisites and authorization, the manual command shape is:
+
+```bash
+python -m scripts.evaluate_stage3 --run-local-evaluation \
+  --confirm-local-only-egress --output /tmp/agentops-stage3-UNIQUE-RUN \
+  --operator-hardware 'WSL2; Quadro T2000; 4 GB VRAM (operator-reported)'
+```
+
+Use a new directory outside the repository for every authorized run. Existing
+directories are refused; failed or partial evidence is never overwritten/resumed.
+The runner serially supplies synthetic health via scoped MockTransport and calls
+the existing coordinator, adapter and PDP. It uses fresh file-backed SQLite per
+case, verifies committed effects independently, and stops before any approval,
+reservation or restart. Only the fixed installed Ollama model can receive real
+requests: at most one per eligible case, maximum 24; no warm-up, retries or
+fallback. This does not need the mock API service to be running.
+
+`results.json` is capped at 128 KiB and checkpointed before/after cases. It records
+commit/source/dataset hashes, requested settings, observed versus operator-reported
+hardware, bounded per-case outcomes, persisted counts/audit correlation, latency,
+category metrics and paired attacks. It stores no raw provider messages, prompts,
+exception text or credentials. Per-case databases remain for inspection. Abort or
+interruption never authorizes retry; retain evidence and obtain fresh authorization
+for a new run. SIGKILL/storage failure can leave incomplete RUNNING/STARTED evidence.
+
+Exit 0 means validation succeeded or all evaluation gates passed; exit 1 means a
+completed failed evaluation or an aborted run; exit 2 means refusal/input/output
+failure. A later passing run does not automatically establish new acceptance;
+it still requires independent review. The archived run and supplied review support
+the current **LOCAL MVP ACCEPTED** decision. Do not relabel cases, alter accepted
+prompts, or relax gates to improve scores. Local inference does not prove
+production readiness, daemon provenance, full-context processing or universal
+prompt-injection immunity.
+
 ## CI and evidence
 
 [GitHub Actions](.github/workflows/ci.yml) runs on pushes and pull requests to `main`, on Ubuntu with Python 3.12.

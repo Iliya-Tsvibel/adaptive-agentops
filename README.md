@@ -79,6 +79,51 @@ python -m adaptive_agentops.operator_cli --db /path/to/existing.db decide ACTION
 There is no database bootstrap or execution CLI.
 See [the end-to-end test](tests/test_restart_e2e.py) for schema initialization and complete internal API wiring; its terminal interaction is simulated.
 
+## Offline agent preparation (Stage 3)
+
+`prepare_offline_agent_action(conn, context, *, mock_output=...)` in
+`adaptive_agentops.agent_workflow` constructs the fixed health proposal, calls
+the authorized and audited health Gateway, validates the resulting observation,
+and strictly parses caller-supplied scripted text. Only a valid restart proposal
+reaches the existing restart Gateway and PDP. Preparation stops after audited
+pending-action creation; it never approves, reserves, or executes an action.
+
+The caller supplies a trusted `RunContext` separately from the script and an
+exclusively held connection to an initialized, file-backed SQLite database.
+Use the existing schema initialization functions, as demonstrated in
+`tests/test_agent_workflow.py`. The script is test input, not AI inference:
+`{"decision":"NO_ACTION"}` or `{"decision":"PROPOSE_RESTART"}`.
+
+The frozen result distinguishes `HEALTH_UNAVAILABLE` (including invalid or
+audit-unconfirmed observations), `NO_ACTION`, `INVALID_OUTPUT`, `PENDING_CREATED`,
+`PENDING_NOT_CREATED`, and `PENDING_UNCERTAIN`. Only confirmed creation returns
+an action ID. Uncertainty does not establish whether an action persisted; the
+coordinator never retries. Separate preparation calls can create separate actions.
+
+After creation, an operator must explicitly review and approve or reject the
+action using the existing CLI. Approval alone never dispatches. Trusted code
+may separately call `execute_approved_mock_restart` with the original context
+and action ID; its existing consumption, reservation, expiry, fresh-policy,
+at-most-one-attempt, and audit rules remain authoritative. Uncertain execution,
+cancellation, and unconfirmed result audit never restore dispatch rights.
+
+This workflow makes no LLM calls, reads no credentials, and has no provider or
+live fallback. Existing health/restart adapters address only the fixed local
+mock API. The offline integration tests intercept both with HTTPX MockTransport,
+reject unexpected requests, and block socket connections and the live LLM entry
+point. They require no server, cloud service, new dependency, or paid API:
+
+```bash
+python -m pytest -q tests/test_agent_workflow.py
+```
+
+Scripted decisions do not prove LLM decision quality, model compatibility, human
+identity, or runtime provenance beyond trusted in-process orchestration.
+Acknowledgement proves simulation only. The separately callable live LLM adapter
+is outside this offline path; this is not a repository-wide network prohibition.
+Parser failures and NO_ACTION return statuses without inventing execution audit
+events; existing policy/result evidence and approval records retain their scope.
+
 ## CI and evidence
 
 [GitHub Actions](.github/workflows/ci.yml) runs on pushes and pull requests to `main`, on Ubuntu with Python 3.12.

@@ -25,7 +25,10 @@ summary and the first failed step. To rerun a failed test, append its pytest
 node ID to the command above. CI keeps diagnostics in the job log and uploads
 no artifacts.
 
-When project dependencies change, update the matching pins in
-`.github/ci-requirements.txt`, including transitive and build dependencies.
+When project dependencies change, update the exact versions and SHA-256 hashes
+for the Linux x86-64 Python 3.12 wheels in `.github/ci-requirements.txt`.
+Review additions and removals in the workflow's package allowlist, including
+transitive and build dependencies. The download step accepts only approved
+hashed wheel pins from PyPI.
 Review the upstream release and its exact commit before updating the checkout
 action pin.

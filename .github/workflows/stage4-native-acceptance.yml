@@ -1,0 +1,48 @@
+name: Stage 4.1 native Linux acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved:
+        description: Privileged disposable VM run explicitly approved by the owner
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage4-native-acceptance
+
+jobs:
+  native-acceptance:
+    if: inputs.approved && github.ref == 'refs/heads/main' && github.repository == 'Iliya-Tsvibel/adaptive-agentops'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out approved main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run separate-UID acceptance on disposable Linux VM
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(uname -s)" = Linux
+          if systemd-detect-virt --container --quiet || grep -Eiq 'microsoft|wsl' /proc/sys/kernel/osrelease; then
+            echo "A native Linux kernel outside containers and WSL is required." >&2
+            exit 1
+          fi
+          staging=$(sudo -n mktemp -d /run/aao-acceptance-code.XXXXXXXX)
+          trap 'sudo -n rm -rf -- "$staging"' EXIT
+          sudo -n chmod 0755 "$staging"
+          for file in adaptive_agentops/__init__.py adaptive_agentops/stage4_boundary/__init__.py \
+            scripts/stage4_peer_probe.py scripts/stage4_native_acceptance.py; do
+            sudo -n install -D -m 0644 -- "$file" "$staging/$file"
+          done
+          sudo -n env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin unshare --net -- sh -ec '
+            ip link set dev lo up
+            cd "$1"
+            exec /usr/bin/python3.12 -B -S scripts/stage4_native_acceptance.py
+          ' sh "$staging"

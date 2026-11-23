@@ -1,32 +1,64 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      # The full Bookworm image includes Git for the Stage 3 evaluator tests.
+      TEST_IMAGE: python:3.12.16-bookworm@sha256:4209fae09a3e20afd863e528bfddc235da5fd5977983e1996cd54cc9a72e6267
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
+      - name: Download pinned test wheels
+        run: |
+          mkdir -p "$RUNNER_TEMP/wheels"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/.github/ci-requirements.txt,dst=/requirements.txt,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/wheels,dst=/wheels" \
+            "$TEST_IMAGE" python -m pip --disable-pip-version-check --no-cache-dir \
+              download --only-binary=:all: --dest /wheels -r /requirements.txt
 
-      - name: Install dependencies
-        run: python -m pip install '.[dev]'
+      - name: Install and run pytest offline
+        run: |
+          docker run --rm --pull never --network none --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --env HOME=/tmp --env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/checkout,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/wheels,dst=/wheels,readonly" \
+            "$TEST_IMAGE" sh -ec '
+              cp -R /checkout /tmp/source
+              cd /tmp/source
+              git rev-parse HEAD
+              python -m venv /tmp/test-venv
+              export PATH="/tmp/test-venv/bin:$PATH"
+              python -m pip --disable-pip-version-check install --no-index --find-links=/wheels ".[dev]"
+              # Run sequentially so the owned loopback tests can bind port 8001.
+              python -m pytest -q --tb=short
+            '
 
-      # The real localhost E2E tests require exclusive use of port 8001.
-      - name: Run full test suite sequentially
-        run: python -m pytest -q
+      - name: Summarize failure
+        if: failure()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          ### Offline Python CI failed
+
+          - For checkout or wheel download failures, inspect the first failed step for Git, Docker pull, or PyPI errors.
+          - For offline install failures, check that `.github/ci-requirements.txt` covers `pyproject.toml` and its build dependencies.
+          - For test failures, expand **Install and run pytest offline** for failed test IDs and tracebacks. Reproduce with `python -m pytest -q --tb=short <test-id>` from a Python 3.12 Git checkout.
+          SUMMARY

@@ -204,8 +204,8 @@ def _expect_frame(sock: socket.socket, expected: bytes, deadline: float) -> None
     raise ProtocolError("invalid, unsupported, truncated or overlong IPC frame")
 
 
-def handshake(endpoint: Endpoint, uids: TrustedUIDs) -> None:
-    """Verify the listener UID and complete one handshake, or raise on denial."""
+@contextmanager
+def _connect_verified(endpoint: Endpoint, uids: TrustedUIDs):
     client_uid, server_uid = endpoint._uids(uids)
     _require_local_uid(client_uid)
     with _socket_directory(endpoint, server_uid) as (fd, name, address):
@@ -223,14 +223,11 @@ def handshake(endpoint: Endpoint, uids: TrustedUIDs) -> None:
             _reject_acls(address)
             if not _same_entry(before, after):
                 raise PathSecurityError("socket entry changed during connection")
-            _send_frame(connection, _REQUEST, deadline)
-            _expect_frame(connection, _RESPONSE, deadline)
+            yield connection, deadline
 
 
-def serve_once(endpoint: Endpoint, uids: TrustedUIDs) -> None:
-    """Listen for one peer and answer one valid handshake. Existing entries deny."""
-    client_uid, server_uid = endpoint._uids(uids)
-    _require_local_uid(server_uid)
+@contextmanager
+def _listen(endpoint: Endpoint, server_uid: int):
     with _socket_directory(endpoint, server_uid) as (fd, name, address):
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
             entry_fd = None
@@ -256,12 +253,7 @@ def serve_once(endpoint: Endpoint, uids: TrustedUIDs) -> None:
                 _reject_acls(address)
                 listener.listen(1)
                 listener.settimeout(_ACCEPT_SECONDS)
-                connection, _address = listener.accept()
-                with connection:
-                    deadline = monotonic() + _EXCHANGE_SECONDS
-                    _require_peer(connection, client_uid)
-                    _expect_frame(connection, _REQUEST, deadline)
-                    _send_frame(connection, _RESPONSE, deadline)
+                yield listener
             finally:
                 # Without a verified inode, leave the entry in place. Malicious
                 # same-UID writers in the protected directory are out of scope.
@@ -273,3 +265,23 @@ def serve_once(endpoint: Endpoint, uids: TrustedUIDs) -> None:
                 finally:
                     if entry_fd is not None:
                         os.close(entry_fd)
+
+
+def handshake(endpoint: Endpoint, uids: TrustedUIDs) -> None:
+    """Verify the listener UID and complete one handshake, or raise on denial."""
+    with _connect_verified(endpoint, uids) as (connection, deadline):
+        _send_frame(connection, _REQUEST, deadline)
+        _expect_frame(connection, _RESPONSE, deadline)
+
+
+def serve_once(endpoint: Endpoint, uids: TrustedUIDs) -> None:
+    """Listen for one peer and answer one valid handshake. Existing entries deny."""
+    client_uid, server_uid = endpoint._uids(uids)
+    _require_local_uid(server_uid)
+    with _listen(endpoint, server_uid) as listener:
+        connection, _address = listener.accept()
+        with connection:
+            deadline = monotonic() + _EXCHANGE_SECONDS
+            _require_peer(connection, client_uid)
+            _expect_frame(connection, _REQUEST, deadline)
+            _send_frame(connection, _RESPONSE, deadline)

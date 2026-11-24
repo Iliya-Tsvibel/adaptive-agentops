@@ -1,0 +1,83 @@
+name: Stage 4.2 native Linux acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage4-native-acceptance
+
+jobs:
+  native-acceptance:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Iliya-Tsvibel/adaptive-agentops' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'Iliya-Tsvibel' &&
+      github.triggering_actor == 'Iliya-Tsvibel' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out approved main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download hash-pinned wheels as the runner user
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test "$(id -u)" -ne 0
+          command -v systemd-detect-virt >/dev/null
+          release=$(cat /proc/sys/kernel/osrelease)
+          if systemd-detect-virt --container --quiet; then
+            echo "A native Linux VM outside containers is required." >&2
+            exit 1
+          else
+            test "$?" -eq 1
+          fi
+          if [[ ${release,,} =~ microsoft|wsl ]]; then
+            echo "A native Linux VM outside containers and WSL is required." >&2
+            exit 1
+          fi
+          mkdir -m 0700 "$RUNNER_TEMP/stage42-wheels"
+          /usr/bin/python3.12 -I -B -S scripts/stage42_native_acceptance.py pins .github/ci-requirements.txt \
+            > "$RUNNER_TEMP/stage42-wheels/requirements.txt"
+          env -i PATH=/usr/bin:/bin PIP_CONFIG_FILE=/dev/null \
+            /usr/bin/python3.12 -I -B -m pip --isolated --disable-pip-version-check --no-cache-dir \
+            download --index-url https://pypi.org/simple --only-binary=:all: --require-hashes \
+            --dest "$RUNNER_TEMP/stage42-wheels" -r "$RUNNER_TEMP/stage42-wheels/requirements.txt"
+
+      - name: Run both IPC acceptance slices offline under distinct UIDs
+        run: |
+          staging=$(sudo -n mktemp -d /opt/aao-stage42-code.XXXXXXXX)
+          trap 'sudo -n rm -rf -- "$staging"' EXIT
+          for file in .github/ci-requirements.txt adaptive_agentops/__init__.py \
+            adaptive_agentops/identity.py adaptive_agentops/policy.py adaptive_agentops/tool_requests.py \
+            adaptive_agentops/stage4_boundary/__init__.py adaptive_agentops/stage4_boundary/delegation.py \
+            scripts/stage4_peer_probe.py scripts/stage4_native_acceptance.py \
+            scripts/stage42_native_acceptance.py scripts/stage42_native_probe.py; do
+            test -f "$file"
+            test ! -L "$file"
+            sudo -n install -D -m 0644 -- "$file" "$staging/$file"
+          done
+          sudo -n install -d -m 0700 -- "$staging/wheels"
+          for wheel in "$RUNNER_TEMP/stage42-wheels/"*.whl; do
+            test -f "$wheel"
+            test ! -L "$wheel"
+            sudo -n sh -ec 'umask 077; cat > "$1"' sh "$staging/wheels/${wheel##*/}" < "$wheel"
+          done
+          sudo -n chmod 0755 "$staging"
+          sudo -n env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+            timeout --signal=INT --kill-after=5s 180s unshare --net -- sh -ec '
+              ip link set dev lo up
+              cd "$1"
+              exec /usr/bin/python3.12 -I -B -S scripts/stage42_native_acceptance.py run
+            ' sh "$staging"

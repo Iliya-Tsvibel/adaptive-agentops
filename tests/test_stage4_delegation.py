@@ -257,20 +257,40 @@ def test_journal_exhaustion_prevents_positive_reply(monkeypatch, session):
     connection.sendall.assert_not_called()
 
 
-def test_expiry_during_journal_write_prevents_admission_reply(monkeypatch, session, clocks):
+@pytest.mark.parametrize(("wall_delta", "elapsed_delta", "accept_calls"), [
+    pytest.param(10 * SECOND, 10 * SECOND, 2, id="expired"),
+    pytest.param(-1, 0, 1, id="clock-error"),
+])
+def test_final_time_check_closes_without_reply(
+    monkeypatch, clocks, wall_delta, elapsed_delta, accept_calls,
+):
+    monkeypatch.setattr(delegation, "_require_local_uid", Mock())
     monkeypatch.setattr(delegation, "_require_peer", Mock())
-    record = session.record
+    record = delegation._Session.record
+    listener = Mock()
 
-    def record_then_expire(peer_uid, outcome):
-        record(peer_uid, outcome)
-        clocks[0] += 10 * SECOND
-        clocks[1] += 10 * SECOND
+    @contextmanager
+    def listen(_endpoint, _server_uid):
+        yield listener
 
-    monkeypatch.setattr(session, "record", record_then_expire)
-    connection = exchange()
-    delegation._handle_connection(connection, session, UIDS.agent, boundary.monotonic() + 2)
-    connection.sendall.assert_not_called()
-    assert session.journal[0].decision is ALLOW  # Decision evidence, independent of delivery.
+    def record_then_change_clock(session, peer_uid, outcome):
+        record(session, peer_uid, outcome)
+        clocks[0] += wall_delta
+        clocks[1] += elapsed_delta
+
+    monkeypatch.setattr(delegation, "_listen", listen)
+    monkeypatch.setattr(delegation._Session, "record", record_then_change_clock)
+    client, connection = socket.socketpair()
+    with client, connection:
+        client.settimeout(2)
+        client.sendall(delegation._PROPOSAL + PAYLOAD)
+        client.shutdown(socket.SHUT_WR)
+        listener.accept.side_effect = [(connection, None), TimeoutError]
+        evidence, = delegation.serve_admission(ENDPOINT, UIDS, fixture_grant_seconds=10)
+        assert client.recv(1) == b""
+
+    assert (evidence.decision, evidence.reason) == (ALLOW, Reason.ADMITTED)
+    assert listener.accept.call_count == accept_calls
 
 
 def test_clock_error_stops_session_after_recorded_denial(monkeypatch):

@@ -53,34 +53,107 @@ def run_probe(uid, args, error=None):
 
 
 @contextmanager
-def listener(uid, gid, link, path, error=None):
-    with subprocess.Popen(probe("listen", link, path, gid), **identity(uid),
+def listening_process(args, uid, path):
+    with subprocess.Popen(args, **identity(uid),
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as process:
         try:
-            # Wait for a listening kernel socket without consuming its only connection.
+            # Match the child's listening inode and its resolved bound path without connecting.
+            fd_dir = Path(f"/proc/{process.pid}/fd")
             deadline = monotonic() + 5
             while monotonic() < deadline:
-                rows = (line.split() for line in Path("/proc/net/unix").read_text().splitlines()[1:])
-                if any(len(row) == 8 and int(row[3], 16) & 0x10000
-                       and row[7].endswith(f"/{path.name}") for row in rows):
-                    break
+                entries = process_fds(fd_dir)
+                rows = (line.split(maxsplit=7) for line in Path("/proc/net/unix").read_text().splitlines()[1:])
+                ready = any(
+                    len(row) == 8 and int(row[3], 16) & 0x10000
+                    and f"socket:[{row[6]}]" in entries.values()
+                    and bound_path(row[7], entries) == path
+                    for row in rows
+                )
                 if process.poll() is not None:
-                    raise RuntimeError(f"{link} listener exited before readiness: {process.communicate()[0]}")
+                    raise RuntimeError(f"{path} listener exited before readiness: {process.communicate()[0]}")
+                if ready:
+                    break
                 sleep(0.02)
             else:
-                raise TimeoutError(f"{link} listener did not become ready")
-
-            info = path.lstat()
-            require((info.st_uid, info.st_gid, info.st_mode) == (uid, gid, stat.S_IFSOCK | 0o660),
-                    f"{link} socket ownership or mode differs")
-            yield
-            output, _ = process.communicate(timeout=5)
-            check_probe(process.returncode, output, error)
-            require(not os.path.lexists(path), f"{link} socket was not cleaned up")
+                raise TimeoutError(f"{path} listener did not become ready")
+            yield process
         finally:
             if process.poll() is None:
                 process.kill()
                 process.communicate(timeout=5)
+
+
+def process_fds(fd_dir):
+    entries = {}
+    try:
+        for fd in fd_dir.iterdir():
+            try:
+                entries[fd.name] = os.readlink(fd)
+            except (FileNotFoundError, PermissionError):
+                continue
+    except (FileNotFoundError, PermissionError):
+        # A child can exit or change credentials while procfs is scanned.
+        pass
+    return entries
+
+
+def bound_path(address, entries):
+    prefix = "/proc/self/fd/"
+    if address.startswith(prefix):
+        fd, _, name = address[len(prefix):].partition("/")
+        directory = entries.get(fd)
+        return Path(directory) / name if directory is not None else None
+    return Path(address)
+
+
+def check_socket_metadata(path, uid, gid):
+    info = path.lstat()
+    require((info.st_uid, info.st_gid, info.st_mode) == (uid, gid, stat.S_IFSOCK | 0o660),
+            f"{path} socket ownership or mode differs")
+
+
+@contextmanager
+def listener(uid, gid, link, path, error=None):
+    with listening_process(probe("listen", link, path, gid), uid, path) as process:
+        check_socket_metadata(path, uid, gid)
+        yield
+        output, _ = process.communicate(timeout=5)
+        check_probe(process.returncode, output, error)
+        require(not os.path.lexists(path), f"{link} socket was not cleaned up")
+
+
+def expect_client_peer_denial(client_uid, server_uid, wrong_uid, gid, link, path):
+    # Bind and listen under the wrong UID. Root moves the live socket into the
+    # trusted directory with the correct entry metadata; its peer UID stays put.
+    with TemporaryDirectory(prefix="wrong-peer-", dir=path.parent.parent) as directory:
+        staging = Path(directory)
+        os.chown(staging, wrong_uid, wrong_uid)
+        staged_path = staging / path.name
+        args = (*PYTHON, "-c", """
+import socket
+import sys
+
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+    listener.settimeout(10)
+    listener.bind(sys.argv[1])
+    listener.listen(1)
+    connection, _ = listener.accept()
+    with connection:
+        connection.settimeout(5)
+        if connection.recv(1) != b"":
+            sys.exit("Client sent protocol data to the wrong UID")
+""", str(staged_path))
+        with listening_process(args, wrong_uid, staged_path) as process:
+            os.chown(staged_path, server_uid, gid)
+            staged_path.chmod(0o660)
+            staged_path.rename(path)
+            try:
+                check_socket_metadata(path, server_uid, gid)
+                run_probe(client_uid, probe("connect", link, path, gid), "IdentityError")
+                output, _ = process.communicate(timeout=5)
+                require(process.returncode == 0, f"{link} wrong-UID listener failed: {output.strip()}")
+            finally:
+                path.unlink()
 
 
 def agent_check(code, *args, groups=None):
@@ -201,6 +274,10 @@ for port in (8000, 8001):
         with listener(CONTROL, PROPOSERS, "agent-control", agent_path, "ProtocolError"):
             expect_no_reply(agent_path)
         print("PASS wrong UID with socket access, invalid frame and denial cleanup", flush=True)
+
+        expect_client_peer_denial(AGENT, CONTROL, TARGET, PROPOSERS, "agent-control", agent_path)
+        expect_client_peer_denial(CONTROL, TARGET, AGENT, DISPATCHERS, "control-target", target_path)
+        print("PASS both clients rejected wrong-UID listeners before sending data", flush=True)
 
 
 if __name__ == "__main__":

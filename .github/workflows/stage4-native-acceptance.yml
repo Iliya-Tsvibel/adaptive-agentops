@@ -2,12 +2,6 @@ name: Stage 4.1 native Linux acceptance
 
 on:
   workflow_dispatch:
-    inputs:
-      approved:
-        description: Privileged disposable VM run explicitly approved by the owner
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -17,7 +11,13 @@ concurrency:
 
 jobs:
   native-acceptance:
-    if: inputs.approved && github.ref == 'refs/heads/main' && github.repository == 'Iliya-Tsvibel/adaptive-agentops'
+    # A rerun inherits github.actor, so require the current triggering actor too.
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Iliya-Tsvibel/adaptive-agentops' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'Iliya-Tsvibel' &&
+      github.triggering_actor == 'Iliya-Tsvibel'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

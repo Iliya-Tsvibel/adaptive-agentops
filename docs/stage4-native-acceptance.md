@@ -1,11 +1,22 @@
 # Stage 4.1 native Linux acceptance
 
-**Status: pending a successful privileged run and human acceptance.**
-Ordinary PR CI is the offline regression suite. Its same-UID and mocked tests
-do not establish native Linux UID isolation. This harness covers ADR-0001
-D01–D03 and the IPC slice of D08. Production remains NO-GO.
+**Status: ACCEPTED — Stage 4.1 isolated native Linux IPC only.**
 
-After the workflow is on `main`, the owner (`Iliya-Tsvibel`) must separately
+The owner accepted the isolated, nonmutating Unix-domain-socket identity
+boundary on 2026-11-24. Native run `45403991684` succeeded on its sole attempt
+and recorded all five PASS markers at
+`de5d9dbfb8db9ccb7a546892f4046010dfc3b9da`.
+[Native run](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45403991684) ·
+[Independent verification](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/11#issuecomment-7132962929) ·
+[Owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/11#issuecomment-7133007767)
+
+The evidence covers D01–D03 and the isolated IPC profile under D08 at that
+revision. Ordinary PR CI supplies development evidence. Stage 4.2 has a
+separate native acceptance gate. Production remains NO-GO.
+[ADR-0001](decisions/ADR-0001-stage4-identity-boundaries.md) ·
+[Stage 4.2 native acceptance](stage42-native-acceptance.md)
+
+For a future run from `main`, the owner (`Iliya-Tsvibel`) must separately
 authorize privileged execution. Confirm the private repository has included
 Actions minutes and paid overage is disabled. The owner selects `main` in
 **Actions → Stage 4.1 native Linux acceptance → Run workflow**. GitHub's actor

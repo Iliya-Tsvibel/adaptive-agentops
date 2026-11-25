@@ -30,6 +30,11 @@ STAGE43_SOURCES = SOURCES + (
     "scripts/stage43_native_acceptance.py",
     "scripts/stage43_native_probe.py",
 )
+STAGE44_SOURCES = STAGE43_SOURCES + (
+    "adaptive_agentops/stage4_boundary/controller_state.py",
+    "scripts/stage44_native_acceptance.py",
+    "scripts/stage44_native_probe.py",
+)
 DRIVER = "scripts/stage42_native_acceptance.py"
 CODE_PARENT = Path("/var/lib")
 SOCKET_PARENT = Path("/run")
@@ -42,7 +47,7 @@ SETUP_FAILED = 78
 PROBE_FAILED = 79
 SOURCE_LIMIT = 128 * 1024
 WHEEL_LIMIT = 10 * 1024**2
-BUNDLE_LIMIT = len(STAGE43_SOURCES) * SOURCE_LIMIT + WHEEL_COUNT * WHEEL_LIMIT + 16384
+BUNDLE_LIMIT = len(STAGE44_SOURCES) * SOURCE_LIMIT + WHEEL_COUNT * WHEEL_LIMIT + 16384
 
 
 def require(condition, message):
@@ -147,19 +152,22 @@ def validate_parent(parent, *, executable):
         require(not flags & os.ST_NOEXEC, f"{parent}: native dependencies require a mount without noexec")
 
 
-def run_offline(source, code_parent, *, stage43=False):
+def run_offline(source, code_parent, *, stage43=False, stage44=False):
     validate_parent(code_parent, executable=True)
     validate_parent(SOCKET_PARENT, executable=False)
     with TemporaryDirectory(prefix="aao-stage42-code.", dir=code_parent) as directory:
         stage = Path(directory)
         validate_directory(stage, 0o700)
-        if stage43:
+        if stage44:
+            stage_bundle(source, stage, STAGE44_SOURCES)
+        elif stage43:
             stage_bundle(source, stage, STAGE43_SOURCES)
         else:
             stage_bundle(source, stage)
         validate_directory(stage, 0o755)
         print("SETUP stage42 protected staging populated", flush=True)
-        result = subprocess.run((sys.executable, "-I", "-B", "-S", str(stage / DRIVER), "run-stage43" if stage43 else "run"),
+        mode = "run-stage44" if stage44 else "run-stage43" if stage43 else "run"
+        result = subprocess.run((sys.executable, "-I", "-B", "-S", str(stage / DRIVER), mode),
                                 cwd=stage, stdin=subprocess.DEVNULL)
         return result.returncode if result.returncode in (0, PROBE_FAILED) else SETUP_FAILED
 
@@ -170,17 +178,19 @@ def interrupted(signum, _frame):
 
 def main():
     try:
-        command = sys.argv[1:2]
-        if command in (["pack"], ["pack-stage43"]) and len(sys.argv) == 4:
-            sources = STAGE43_SOURCES if command == ["pack-stage43"] else SOURCES
-            pack(sys.argv[2], Path(sys.argv[3]), sys.stdout.buffer, sources)
+        command = sys.argv[1] if len(sys.argv) > 1 else ""
+        pack_sources = {"pack": SOURCES, "pack-stage43": STAGE43_SOURCES, "pack-stage44": STAGE44_SOURCES}
+        if command in pack_sources and len(sys.argv) == 4:
+            pack(sys.argv[2], Path(sys.argv[3]), sys.stdout.buffer, pack_sources[command])
             return 0
-        require(sys.argv[1:] in (["run"], ["run-stage43"]) and os.geteuid() == 0
+        require(len(sys.argv) == 2 and command in ("run", "run-stage43", "run-stage44") and os.geteuid() == 0
                 and sys.flags.isolated and sys.flags.no_site and sys.flags.dont_write_bytecode,
                 "Expected isolated root setup in the acceptance namespace")
         signal.signal(signal.SIGTERM, interrupted)
         os.umask(0o077)
-        return run_offline(sys.stdin.buffer, CODE_PARENT, stage43=command == ["run-stage43"])
+        return run_offline(
+            sys.stdin.buffer, CODE_PARENT, stage43=command == "run-stage43", stage44=command == "run-stage44",
+        )
     except (RuntimeError, OSError, BadZipFile, subprocess.CalledProcessError, KeyboardInterrupt) as error:
         if isinstance(error, OSError):
             detail = f"filesystem or process operation failed (errno={error.errno})"

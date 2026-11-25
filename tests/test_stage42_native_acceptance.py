@@ -91,3 +91,23 @@ def test_effect_check_rejects_even_a_swallowed_outbound_attempt(monkeypatch):
         hooks[0]("socket.connect", ())
     with pytest.raises(RuntimeError, match="execution path was reached"):
         verify()
+
+
+def test_effect_check_permits_only_the_explicit_controller_database(monkeypatch, tmp_path):
+    hooks = []
+    monkeypatch.setattr(sys, "addaudithook", hooks.append)
+    database = tmp_path / "controller.sqlite3"
+    verify = probe.effect_guard(sqlite_database=database)
+    hooks[0]("sqlite3.connect", (database.as_uri() + "?mode=rw",))
+    for name in (
+        ":memory:", Path(":memory:"), b":memory:", "file://[malformed",
+        database.as_uri() + "?mode=rw&nolock=1", (tmp_path / "other.sqlite3").as_uri() + "?mode=rw",
+    ):
+        with pytest.raises(RuntimeError, match="attempted an effect"):
+            hooks[0]("sqlite3.connect", (name,))
+    with pytest.raises(RuntimeError, match="execution path was reached"):
+        verify()
+
+    probe.effect_guard()
+    with pytest.raises(RuntimeError, match="attempted an effect"):
+        hooks[1]("sqlite3.connect", (database.as_uri() + "?mode=rw",))

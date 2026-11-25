@@ -242,7 +242,7 @@ def proposal_socket(legacy):
         yield socket_dir / "proposal.sock"
 
 
-def run():
+def run(*, stage43=False):
     with ExitStack() as resources:
         try:
             prepare()
@@ -251,6 +251,10 @@ def run():
 
             legacy_paths = resources.enter_context(legacy.prepare_native())
             path = resources.enter_context(proposal_socket(legacy))
+            if stage43:
+                from scripts import stage43_native_acceptance
+
+                managed_paths = resources.enter_context(stage43_native_acceptance.prepare(legacy))
         except (RuntimeError, OSError, BadZipFile, UnicodeError, ImportError) as error:
             if isinstance(error, OSError):
                 detail = f"setup filesystem or process operation failed (errno={error.errno})"
@@ -268,6 +272,8 @@ def run():
             check_denials(legacy, path)
             check_wrong_server(legacy, path)
             check_evidence_failure(legacy, path)
+            if stage43:
+                stage43_native_acceptance.run(legacy, *managed_paths)
         except Exception:
             print_exc()
             return PROBE_FAILED
@@ -277,7 +283,7 @@ def run():
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "pins":
         print(*dependency_pins(Path(sys.argv[2])).values(), sep="\n")
-    elif sys.argv[1:] == ["run"]:
-        sys.exit(run())
+    elif sys.argv[1:] in (["run"], ["run-stage43"]):
+        sys.exit(run(stage43=sys.argv[1] == "run-stage43"))
     else:
-        sys.exit("Expected pins MANIFEST or run")
+        sys.exit("Expected pins MANIFEST, run, or run-stage43")

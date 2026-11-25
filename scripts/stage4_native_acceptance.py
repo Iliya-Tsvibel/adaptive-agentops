@@ -53,8 +53,9 @@ def run_probe(uid, args, error=None):
 
 
 @contextmanager
-def listening_process(args, uid, path):
-    with subprocess.Popen(args, **identity(uid),
+def listening_process(args, uid, path, *, groups=None, additional_paths=()):
+    paths = {path, *additional_paths}
+    with subprocess.Popen(args, **identity(uid, groups),
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as process:
         try:
             # Match the child's listening inode and its resolved bound path without connecting.
@@ -63,15 +64,15 @@ def listening_process(args, uid, path):
             while monotonic() < deadline:
                 entries = process_fds(fd_dir)
                 rows = (line.split(maxsplit=7) for line in Path("/proc/net/unix").read_text().splitlines()[1:])
-                ready = any(
-                    len(row) == 8 and int(row[3], 16) & 0x10000
-                    and f"socket:[{row[6]}]" in entries.values()
-                    and bound_path(row[7], entries) == path
+                listening = {
+                    bound_path(row[7], entries)
                     for row in rows
-                )
+                    if len(row) == 8 and int(row[3], 16) & 0x10000
+                    and f"socket:[{row[6]}]" in entries.values()
+                }
                 if process.poll() is not None:
                     raise RuntimeError(f"{path} listener exited before readiness: {process.communicate()[0]}")
-                if ready:
+                if paths <= listening:
                     break
                 sleep(0.02)
             else:

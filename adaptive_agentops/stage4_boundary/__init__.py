@@ -49,6 +49,7 @@ class ProtocolError(BoundaryError):
 class Link(Enum):
     AGENT_CONTROL = "agent-control"
     CONTROL_TARGET = "control-target"
+    OPERATOR_CONTROL = "operator-control"
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,7 +98,9 @@ class Endpoint:
     def _uids(self, uids: TrustedUIDs) -> tuple[int, int]:
         if self.link is Link.AGENT_CONTROL:
             return uids.agent, uids.control
-        return uids.control, uids.target
+        if self.link is Link.CONTROL_TARGET:
+            return uids.control, uids.target
+        raise ValueError("operator link requires the dedicated operator protocol")
 
 
 def _require_local_uid(expected: int) -> None:
@@ -107,13 +110,19 @@ def _require_local_uid(expected: int) -> None:
         raise IdentityError("process UID does not match the configured role")
 
 
-def _require_peer(sock: socket.socket, expected: int) -> None:
+def _peer_uid(sock: socket.socket) -> int:
     try:
         raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, _UCRED.size)
         pid, uid, _gid = _UCRED.unpack(raw)
     except (AttributeError, OSError, struct.error) as exc:
         raise IdentityError("peer credentials unavailable") from exc
-    if pid <= 0 or uid != expected:
+    if pid <= 0:
+        raise IdentityError("peer credentials unavailable")
+    return uid
+
+
+def _require_peer(sock: socket.socket, expected: int) -> None:
+    if _peer_uid(sock) != expected:
         raise IdentityError("peer credentials do not match the configured role")
 
 
@@ -204,9 +213,12 @@ def _expect_frame(sock: socket.socket, expected: bytes, deadline: float) -> None
     raise ProtocolError("invalid, unsupported, truncated or overlong IPC frame")
 
 
-@contextmanager
 def _connect_verified(endpoint: Endpoint, uids: TrustedUIDs):
-    client_uid, server_uid = endpoint._uids(uids)
+    return _connect_as(endpoint, *endpoint._uids(uids))
+
+
+@contextmanager
+def _connect_as(endpoint: Endpoint, client_uid: int, server_uid: int):
     _require_local_uid(client_uid)
     with _socket_directory(endpoint, server_uid) as (fd, name, address):
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:

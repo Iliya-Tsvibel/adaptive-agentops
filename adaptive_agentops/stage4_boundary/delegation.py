@@ -53,6 +53,7 @@ class AdmissionReason(str, Enum):
     MISSING_GRANT = "MISSING_GRANT"
     GRANT_SCOPE_MISMATCH = "GRANT_SCOPE_MISMATCH"
     GRANT_EXPIRED = "GRANT_EXPIRED"
+    GRANT_REVOKED = "GRANT_REVOKED"
     POLICY_DENIED = "POLICY_DENIED"
     POLICY_ERROR = "POLICY_ERROR"
     CLOCK_ERROR = "CLOCK_ERROR"
@@ -102,7 +103,7 @@ class _SessionClock:
 
 
 @dataclass(frozen=True, slots=True)
-class _FixtureGrant:
+class _Grant:
     grant_id: UUID
     session_id: UUID
     run_id: UUID
@@ -155,13 +156,17 @@ class _Session:
         self.clock = _SessionClock()
         self.journal: list[AdmissionEvent] = []
         self.grant = None
+        self.grant_revoked = False
         if grant_seconds is not None:
-            wall, elapsed = self.clock.start
-            lifetime = grant_seconds * _SECOND_NS
-            self.grant = _FixtureGrant(
-                uuid4(), self.session_id, self.context.run_id, agent_uid, self.context.agent_id,
-                _TOOL, _RESOURCE, self.context.environment, wall + lifetime, elapsed + lifetime,
-            )
+            self.grant = self.new_grant(agent_uid, grant_seconds, self.clock.start)
+
+    def new_grant(self, agent_uid: int, seconds: int, sample: tuple[int, int]) -> _Grant:
+        wall, elapsed = sample
+        lifetime = seconds * _SECOND_NS
+        return _Grant(
+            uuid4(), self.session_id, self.context.run_id, agent_uid, self.context.agent_id,
+            _TOOL, _RESOURCE, self.context.environment, wall + lifetime, elapsed + lifetime,
+        )
 
     def evaluate(self, peer_uid: int, proposal: MockGetHealthProposal) -> _Outcome:
         try:
@@ -174,6 +179,8 @@ class _Session:
             return _Outcome(AdmissionReason.MISSING_GRANT, False)
         if not grant.matches(self.session_id, self.context, peer_uid, proposal):
             return _Outcome(AdmissionReason.GRANT_SCOPE_MISMATCH, False)
+        if self.grant_revoked:
+            return _Outcome(AdmissionReason.GRANT_REVOKED, False)
         if not grant.is_live(sample):
             return _Outcome(AdmissionReason.GRANT_EXPIRED, False)
 
@@ -304,7 +311,7 @@ def _handle_connection(connection, session: _Session, client_uid: int, deadline:
             sample = session.clock.sample()
         except ClockError:
             return False
-        if not session.grant.is_live(sample):
+        if session.grant_revoked or not session.grant.is_live(sample):
             return True
 
     try:

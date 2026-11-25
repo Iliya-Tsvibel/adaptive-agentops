@@ -16,10 +16,10 @@ WHEELS = [
 ]
 
 
-def make_bundle(*, omit=None, extra=None):
+def make_bundle(*, omit=None, extra=None, sources=setup.SOURCES):
     data = BytesIO()
     with ZipFile(data, "w") as archive:
-        for name in [*setup.SOURCES, *WHEELS]:
+        for name in [*sources, *WHEELS]:
             if name != omit:
                 archive.writestr(name, b"fixture")
         if extra is not None:
@@ -255,3 +255,19 @@ def test_probe_start_follows_both_native_setups(monkeypatch, capsys, failure):
             "legacy setup", "proposal setup", ("agent", "target"), *["proposal"] * 4,
             "proposal cleanup", "legacy cleanup",
         ]
+
+
+def test_stage43_is_an_explicit_exact_native_source_allowlist(tmp_path):
+    baseline = tmp_path / "baseline"
+    baseline.mkdir()
+    with pytest.raises(RuntimeError, match="Unexpected staging bundle entry"):
+        setup.stage_bundle(make_bundle(sources=setup.STAGE43_SOURCES), baseline)
+    assert not list(baseline.iterdir())
+    with pytest.raises(RuntimeError, match="missing reviewed source"):
+        setup.stage_bundle(make_bundle(), baseline, setup.STAGE43_SOURCES)
+    assert not list(baseline.iterdir())
+
+    setup.stage_bundle(make_bundle(sources=setup.STAGE43_SOURCES), baseline, setup.STAGE43_SOURCES)
+    assert {
+        path.relative_to(baseline).as_posix() for path in baseline.rglob("*") if path.is_file()
+    } == set(setup.STAGE43_SOURCES) | set(WHEELS)

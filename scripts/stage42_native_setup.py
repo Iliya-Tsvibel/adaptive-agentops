@@ -25,6 +25,11 @@ SOURCES = (
     "scripts/stage42_native_acceptance.py",
     "scripts/stage42_native_probe.py",
 )
+STAGE43_SOURCES = SOURCES + (
+    "adaptive_agentops/stage4_boundary/operator.py",
+    "scripts/stage43_native_acceptance.py",
+    "scripts/stage43_native_probe.py",
+)
 DRIVER = "scripts/stage42_native_acceptance.py"
 WHEEL_NAME = re.compile(
     r"(annotated_types|pydantic|pydantic_core|typing_extensions|typing_inspection)"
@@ -35,7 +40,7 @@ SETUP_FAILED = 78
 PROBE_FAILED = 79
 SOURCE_LIMIT = 128 * 1024
 WHEEL_LIMIT = 10 * 1024**2
-BUNDLE_LIMIT = len(SOURCES) * SOURCE_LIMIT + WHEEL_COUNT * WHEEL_LIMIT + 16384
+BUNDLE_LIMIT = len(STAGE43_SOURCES) * SOURCE_LIMIT + WHEEL_COUNT * WHEEL_LIMIT + 16384
 
 
 def require(condition, message):
@@ -64,11 +69,11 @@ def git(*args):
                           check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
 
 
-def pack(revision, wheelhouse, output):
+def pack(revision, wheelhouse, output, sources=SOURCES):
     require(re.fullmatch(r"[0-9a-f]{40}", revision), "Expected exact commit SHA")
     buffer = BytesIO()
     with ZipFile(buffer, "w", compression=ZIP_STORED) as bundle:
-        for name in SOURCES:
+        for name in sources:
             entry = git("ls-tree", "--full-tree", revision, "--", name)
             require(entry.startswith(b"100644 blob ") and entry.endswith(b"\t" + name.encode() + b"\n"),
                     f"Expected committed regular file: {name}")
@@ -95,7 +100,7 @@ def pack(revision, wheelhouse, output):
     output.write(buffer.getbuffer())
 
 
-def stage_bundle(source, stage):
+def stage_bundle(source, stage, sources=SOURCES):
     data = source.read(BUNDLE_LIMIT + 1)
     require(len(data) <= BUNDLE_LIMIT, "Staging bundle exceeds size limit")
     with ZipFile(BytesIO(data)) as bundle:
@@ -105,13 +110,13 @@ def stage_bundle(source, stage):
             name = entry.filename
             wheel = name.startswith("wheels/") and WHEEL_NAME.fullmatch(name[7:]) is not None
             limit = WHEEL_LIMIT if wheel else SOURCE_LIMIT
-            require((name in SOURCES or wheel) and name not in seen and name == entry.orig_filename
+            require((name in sources or wheel) and name not in seen and name == entry.orig_filename
                     and entry.compress_type == ZIP_STORED and entry.file_size <= limit
                     and entry.file_size == entry.compress_size
                     and stat.S_IFMT(entry.external_attr >> 16) in (0, stat.S_IFREG),
                     "Unexpected staging bundle entry")
             seen.add(name)
-        require(set(SOURCES) <= seen and len(seen) == len(SOURCES) + WHEEL_COUNT,
+        require(set(sources) <= seen and len(seen) == len(sources) + WHEEL_COUNT,
                 "Staging bundle is missing reviewed source or wheel artifacts")
 
         for entry in entries:
@@ -119,14 +124,14 @@ def stage_bundle(source, stage):
             target.parent.mkdir(parents=True, exist_ok=True)
             with target.open("xb") as output:
                 output.write(bundle.read(entry))
-            if entry.filename in SOURCES:
+            if entry.filename in sources:
                 target.chmod(0o644)
-        for directory in {(stage / name).parent for name in SOURCES}:
+        for directory in {(stage / name).parent for name in sources}:
             directory.chmod(0o755)
         stage.chmod(0o755)
 
 
-def run_offline(source, run_parent):
+def run_offline(source, run_parent, *, stage43=False):
     # Check the ancestors in order. Neither permits an unprivileged rename or replacement.
     validate_directory(run_parent.parent)
     validate_directory(run_parent)
@@ -135,10 +140,13 @@ def run_offline(source, run_parent):
     with TemporaryDirectory(prefix="aao-stage42-code.", dir=run_parent) as directory:
         stage = Path(directory)
         validate_directory(stage, 0o700)
-        stage_bundle(source, stage)
+        if stage43:
+            stage_bundle(source, stage, STAGE43_SOURCES)
+        else:
+            stage_bundle(source, stage)
         validate_directory(stage, 0o755)
         print("SETUP stage42 protected staging populated", flush=True)
-        result = subprocess.run((sys.executable, "-I", "-B", "-S", str(stage / DRIVER), "run"),
+        result = subprocess.run((sys.executable, "-I", "-B", "-S", str(stage / DRIVER), "run-stage43" if stage43 else "run"),
                                 cwd=stage, stdin=subprocess.DEVNULL)
         return result.returncode if result.returncode in (0, PROBE_FAILED) else SETUP_FAILED
 
@@ -149,15 +157,17 @@ def interrupted(signum, _frame):
 
 def main():
     try:
-        if sys.argv[1:2] == ["pack"] and len(sys.argv) == 4:
-            pack(sys.argv[2], Path(sys.argv[3]), sys.stdout.buffer)
+        command = sys.argv[1:2]
+        if command in (["pack"], ["pack-stage43"]) and len(sys.argv) == 4:
+            sources = STAGE43_SOURCES if command == ["pack-stage43"] else SOURCES
+            pack(sys.argv[2], Path(sys.argv[3]), sys.stdout.buffer, sources)
             return 0
-        require(sys.argv[1:] == ["run"] and os.geteuid() == 0
+        require(sys.argv[1:] in (["run"], ["run-stage43"]) and os.geteuid() == 0
                 and sys.flags.isolated and sys.flags.no_site and sys.flags.dont_write_bytecode,
                 "Expected isolated root setup in the acceptance namespace")
         signal.signal(signal.SIGTERM, interrupted)
         os.umask(0o077)
-        return run_offline(sys.stdin.buffer, Path("/run"))
+        return run_offline(sys.stdin.buffer, Path("/run"), stage43=command == ["run-stage43"])
     except (RuntimeError, OSError, BadZipFile, subprocess.CalledProcessError, KeyboardInterrupt) as error:
         if isinstance(error, OSError):
             detail = f"filesystem or process operation failed (errno={error.errno})"

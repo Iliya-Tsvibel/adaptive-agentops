@@ -264,7 +264,7 @@ def proposal_socket(legacy):
         yield socket_dir / "proposal.sock"
 
 
-def run(*, stage43=False, stage44=False):
+def run(*, selected=42):
     with ExitStack() as resources:
         try:
             prepare()
@@ -274,14 +274,18 @@ def run(*, stage43=False, stage44=False):
             legacy_paths = resources.enter_context(legacy.prepare_native())
             verify_dependency_runtime(legacy)
             path = resources.enter_context(proposal_socket(legacy))
-            if stage43 or stage44:
+            if selected >= 43:
                 from scripts import stage43_native_acceptance
 
                 managed_paths = resources.enter_context(stage43_native_acceptance.prepare(legacy))
-            if stage44:
+            if selected >= 44:
                 from scripts import stage44_native_acceptance
 
                 protected_paths = resources.enter_context(stage44_native_acceptance.prepare(legacy))
+            if selected >= 45:
+                from scripts import stage45_native_acceptance
+
+                dispatch_paths = resources.enter_context(stage45_native_acceptance.prepare(legacy))
         except (RuntimeError, OSError, BadZipFile, UnicodeError, ImportError, subprocess.TimeoutExpired) as error:
             if isinstance(error, OSError):
                 detail = f"setup filesystem or process operation failed (errno={error.errno})"
@@ -301,10 +305,12 @@ def run(*, stage43=False, stage44=False):
             check_denials(legacy, path)
             check_wrong_server(legacy, path)
             check_evidence_failure(legacy, path)
-            if stage43 or stage44:
+            if selected >= 43:
                 stage43_native_acceptance.run(legacy, *managed_paths)
-            if stage44:
+            if selected >= 44:
                 stage44_native_acceptance.run(legacy, *protected_paths)
+            if selected >= 45:
+                stage45_native_acceptance.run(legacy, *dispatch_paths)
         except Exception:
             print_exc()
             return PROBE_FAILED
@@ -314,7 +320,8 @@ def run(*, stage43=False, stage44=False):
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "pins":
         print(*dependency_pins(Path(sys.argv[2])).values(), sep="\n")
-    elif sys.argv[1:] in (["run"], ["run-stage43"], ["run-stage44"]):
-        sys.exit(run(stage43=sys.argv[1] == "run-stage43", stage44=sys.argv[1] == "run-stage44"))
     else:
-        sys.exit("Expected pins MANIFEST, run, run-stage43 or run-stage44")
+        modes = {"run": 42, "run-stage43": 43, "run-stage44": 44, "run-stage45": 45}
+        if len(sys.argv) == 2 and sys.argv[1] in modes:
+            sys.exit(run(selected=modes[sys.argv[1]]))
+        sys.exit("Expected pins MANIFEST or a supported native run mode")

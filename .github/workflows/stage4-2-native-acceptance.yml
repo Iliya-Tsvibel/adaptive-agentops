@@ -13,6 +13,11 @@ on:
         type: boolean
         required: false
         default: false
+      include_stage45:
+        description: Include Stage 4.5 no-effect dispatch (requires Stage 4.3 and 4.4)
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -71,11 +76,13 @@ jobs:
         env:
           INCLUDE_STAGE43: ${{ inputs.include_stage43 }}
           INCLUDE_STAGE44: ${{ inputs.include_stage44 }}
+          INCLUDE_STAGE45: ${{ inputs.include_stage45 }}
         run: |
-          case "$INCLUDE_STAGE43:$INCLUDE_STAGE44" in
-            true:true) pack=pack-stage44; run=run-stage44 ;;
-            true:false) pack=pack-stage43; run=run-stage43 ;;
-            false:false) pack=pack; run=run ;;
+          case "$INCLUDE_STAGE43:$INCLUDE_STAGE44:$INCLUDE_STAGE45" in
+            true:true:true) pack=pack-stage45; run=run-stage45 ;;
+            true:true:false) pack=pack-stage44; run=run-stage44 ;;
+            true:false:false) pack=pack-stage43; run=run-stage43 ;;
+            false:false:false) pack=pack; run=run ;;
             *) echo "Invalid native acceptance scope" >&2; exit 1 ;;
           esac
           if ! setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py"); then

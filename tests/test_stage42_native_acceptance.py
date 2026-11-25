@@ -111,3 +111,35 @@ def test_effect_check_permits_only_the_explicit_controller_database(monkeypatch,
     probe.effect_guard()
     with pytest.raises(RuntimeError, match="attempted an effect"):
         hooks[1]("sqlite3.connect", (database.as_uri() + "?mode=rw",))
+
+
+def test_effect_check_only_permits_explicit_unix_peer(monkeypatch, tmp_path):
+    import socket
+    from types import SimpleNamespace
+
+    hooks = []
+    monkeypatch.setattr(sys, "addaudithook", hooks.append)
+    peer = tmp_path / "dispatch.sock"
+    verify = probe.effect_guard(unix_peer=peer)
+    af_unix = SimpleNamespace(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
+    hooks[0]("socket.connect", (af_unix, str(peer)))
+    for args in (
+        (af_unix, str(tmp_path / "other.sock")), (af_unix, "\0abstract"),
+        (SimpleNamespace(family=socket.AF_INET), ("127.0.0.1", 1024)),
+        (SimpleNamespace(family=socket.AF_UNIX, type=socket.SOCK_DGRAM), str(peer)),
+    ):
+        with pytest.raises(RuntimeError, match="attempted an effect"):
+            hooks[0]("socket.connect", args)
+    with pytest.raises(RuntimeError, match="execution path was reached"):
+        verify()
+
+
+@pytest.mark.parametrize("event", ["socket.sendmsg", "socket.sendmsg_afalg"])
+def test_effect_check_records_datagram_and_descriptor_egress(event, monkeypatch):
+    hooks = []
+    monkeypatch.setattr(sys, "addaudithook", hooks.append)
+    verify = probe.effect_guard()
+    with pytest.raises(RuntimeError, match="attempted an effect"):
+        hooks[0](event, ())
+    with pytest.raises(RuntimeError, match="execution path was reached"):
+        verify()

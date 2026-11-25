@@ -345,7 +345,7 @@ def test_dependency_preflight_failure_precedes_all_probe_markers_and_unwinds(mon
     monkeypatch.setattr(driver, "prepare", lambda: None)
     monkeypatch.setattr(legacy, "prepare_native", prepare_legacy)
     monkeypatch.setattr(driver, "verify_dependency_runtime", dependency_failure)
-    assert driver.run(stage43=True) == setup.SETUP_FAILED
+    assert driver.run(selected=43) == setup.SETUP_FAILED
     output = capsys.readouterr()
     assert output.out == ""
     assert "Stage 4.2 setup failure" in output.err
@@ -378,3 +378,15 @@ def test_stage44_scope_requires_the_complete_cumulative_source_allowlist(tmp_pat
     assert {
         path.relative_to(stage).as_posix() for path in stage.rglob("*") if path.is_file()
     } == set(setup.STAGE44_SOURCES) | set(WHEELS)
+
+
+def test_stage45_scope_requires_the_complete_cumulative_source_allowlist(tmp_path):
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    with pytest.raises(RuntimeError, match="missing reviewed source"):
+        setup.stage_bundle(make_bundle(sources=setup.STAGE44_SOURCES), stage, setup.STAGE45_SOURCES)
+    assert not list(stage.iterdir())
+    setup.stage_bundle(make_bundle(sources=setup.STAGE45_SOURCES), stage, setup.STAGE45_SOURCES)
+    assert {
+        path.relative_to(stage).as_posix() for path in stage.rglob("*") if path.is_file()
+    } == set(setup.STAGE45_SOURCES) | set(WHEELS)

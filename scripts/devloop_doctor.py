@@ -12,9 +12,13 @@ from urllib.parse import unquote, urlsplit
 ARCHITECTURE = "docs/architecture/stage4-local.md"
 ADR = "docs/decisions/ADR-0001-stage4-identity-boundaries.md"
 LOOP = "docs/developer-loop.md"
+CAMPAIGN = "docs/campaigns/stage4-autonomous-completion.md"
+LEDGER = "docs/campaigns/stage4-progress.md"
 STAGE41 = "docs/stage4-native-acceptance.md"
 STAGE42 = "docs/stage42-native-acceptance.md"
+STAGE43 = "docs/stage43-native-acceptance.md"
 CONTRACT42 = "docs/tasks/stage4/4.2-scoped-delegation-contract.md"
+CONTRACT43 = "docs/tasks/stage4/4.3-operator-delegation-contract.md"
 APPROVED_SOURCE = "4cbbc0f325ad1cfc427008c6b55d314355b19550"
 ADR_BLOB = "b8a5653a32b95c966d47d79f05907f4aa3fb4f46"
 REPOSITORY = "Iliya-Tsvibel/adaptive-agentops"
@@ -22,13 +26,17 @@ NATIVE_RUN = f"https://github.com/{REPOSITORY}/actions/runs/45403991684"
 SIGN_OFF = f"https://github.com/{REPOSITORY}/pull/11#issuecomment-7133007767"
 STAGE41_COMMIT = "de5d9dbfb8db9ccb7a546892f4046010dfc3b9da"
 REQUIRED_LINKS = {
-    "AGENTS.md": {"SECURITY.md", LOOP, ARCHITECTURE, CONTRACT42},
+    "AGENTS.md": {"SECURITY.md", LOOP, ARCHITECTURE, CONTRACT42, CAMPAIGN, LEDGER},
     "SECURITY.md": {ARCHITECTURE, LOOP, CONTRACT42, "docs/stage2-security.md"},
-    LOOP: {"AGENTS.md", "SECURITY.md", ARCHITECTURE, STAGE41, CONTRACT42},
+    LOOP: {"AGENTS.md", "SECURITY.md", ARCHITECTURE, STAGE41, CONTRACT42, CAMPAIGN, LEDGER},
+    CAMPAIGN: {ADR, ARCHITECTURE, LEDGER, LOOP, STAGE43, "SECURITY.md"},
+    LEDGER: {CAMPAIGN, ADR, STAGE41, CONTRACT42, STAGE43},
     ARCHITECTURE: {ADR, STAGE41, STAGE42, CONTRACT42, "docs/stage2-security.md",
                    "docs/stage3-acceptance.md"},
     ADR: {ARCHITECTURE, STAGE41, CONTRACT42},
     STAGE41: {ADR, STAGE42, NATIVE_RUN, SIGN_OFF},
+    STAGE43: {CONTRACT43, STAGE42},
+    CONTRACT43: {ADR, CONTRACT42},
 }
 DOCS = sorted(set(REQUIRED_LINKS) | {
     STAGE42, CONTRACT42, "docs/stage2-security.md", "docs/stage3-acceptance.md",

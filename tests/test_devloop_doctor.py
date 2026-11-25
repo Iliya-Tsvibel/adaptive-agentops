@@ -44,6 +44,21 @@ def test_conflicting_or_missing_source_information_is_blocked(sources, file, bef
     assert any(diagnostic in problem for problem in doctor.check_documents(sources))
 
 
+@pytest.mark.parametrize("file", [doctor.CAMPAIGN, doctor.LEDGER])
+def test_missing_campaign_document_is_blocked(sources, file):
+    (sources / file).unlink()
+    assert f"{file} is missing, unsafe, or unreadable" in doctor.check_documents(sources)
+
+
+@pytest.mark.parametrize("file", [doctor.CAMPAIGN, doctor.LEDGER])
+def test_governance_requires_campaign_links(sources, file):
+    agents = sources / "AGENTS.md"
+    original = agents.read_text(encoding="utf-8")
+    assert f"({file})" in original
+    agents.write_text(original.replace(f"({file})", "(SECURITY.md)"), encoding="utf-8")
+    assert doctor.check_documents(sources) == ["AGENTS.md is missing required source or evidence links"]
+
+
 def test_duplicate_adr_is_blocked(sources):
     original = sources / doctor.ADR
     copyfile(original, original.with_name("ADR-0001-duplicate.md"))

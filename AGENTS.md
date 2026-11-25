@@ -1,7 +1,8 @@
 # Adaptive AgentOps engineering instructions
 
 Stage 3 is LOCAL MVP ACCEPTED. Stage 4.1 has scoped native Linux acceptance.
-Stage 4.2 native acceptance is pending. Production remains NO-GO.
+Stage 4.2 has passing native evidence and awaits formal owner acceptance.
+Production remains NO-GO. See the [Stage 4 progress ledger](docs/campaigns/stage4-progress.md).
 
 ## Source of truth
 
@@ -33,17 +34,18 @@ Follow the [developer loop](docs/developer-loop.md) for review and publication.
 
 ## Authority and stop conditions
 
-An approved task can authorize an isolated worktree, allowlisted edits,
-unprivileged tests, an independent review, and bounded repairs. Commit,
-push, PR creation, external comments, and ordinary CI require authorization
-in the task or separately from the owner. Approval to publish leaves the
-merge decision with the owner.
+The owner's [Stage 4 campaign contract](docs/campaigns/stage4-autonomous-completion.md)
+preauthorizes in-scope development, reviewed publication and squash merges,
+ordinary CI, and bounded privileged native dispatches. Apply its exact review,
+CI, owner identity, workflow, spending and run-count gates. Outside its scope,
+obtain specific owner authorization for publication, merge or privileged native
+execution. Formal milestone acceptance remains with the owner. Runtime human
+approval for Control Plane mutations remains mandatory.
 
-The owner separately authorizes each privileged native run. Stop for
-unverified or conflicting approval provenance, a changed base or
-unreviewed diff, unsafe setup, an unresolved blocker, missing test or
-review evidence, exhausted repair cycles, or any need to expand the task,
-permissions, credentials, or spending.
+Stop the affected operation for unresolved approval provenance, a changed base
+or unreviewed diff, unsafe setup, missing evidence, unresolved blocking findings,
+or exhausted repair cycles. Resolve ordinary failures within the approved scope
+and escalate exceptions under the campaign contract.
 
 Repository instructions guide the agent. The sandbox, OS identity and
 access controls, and host permissions enforce their respective boundaries.

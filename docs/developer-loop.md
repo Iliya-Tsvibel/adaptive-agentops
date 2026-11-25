@@ -2,9 +2,12 @@
 
 The [repository instructions](../AGENTS.md), [security rules](../SECURITY.md),
 and [approved architecture](architecture/stage4-local.md) define the
-boundaries. A task can authorize automation within those boundaries. The
-owner retains the merge decision and separately authorizes privileged native
-acceptance. Production remains NO-GO.
+boundaries. The owner preauthorizes reviewed squash merges and bounded
+privileged native dispatches inside the [Stage 4 campaign contract](campaigns/stage4-autonomous-completion.md).
+Outside the campaign scope, merge and privileged native execution require
+specific owner authorization. The owner retains formal milestone acceptance.
+Runtime human approval for Control Plane mutations remains mandatory.
+Production remains NO-GO.
 
 ## Task contracts
 
@@ -37,7 +40,8 @@ A blocked result requires investigation before relying on the affected gate.
 2. **Independent Reviewer:** Inspect the exact diff against the approved base, contract, security assumptions, and test evidence. Return severity, file and line, impact, remediation, and a GO or NO-GO verdict. The Reviewer stays read-only.
 3. **Repair and local CI:** Use at most two repair cycles total across review and CI. Keep repairs within scope, repeat affected checks, and ask the same independent Reviewer to assess material changes. Never reuse an earlier verdict for a materially different diff.
 4. **Publication and GitHub CI:** When the task authorizes publication, commit and push only the reviewed files and open one PR. Its standard CI starts on the PR event. Check that the PR base and head, published patch, and commit tree match the reviewed base and diff. Verify completed GitHub CI and job evidence for that exact published revision. Post the attributed review and evidence only within the granted publication authority.
-5. **Merge gate:** Require verified scope, matching reviewed and published revisions, completed passing CI, and resolution of blocking findings. Disclose residual risks to the owner. The owner decides whether to merge. Native acceptance remains a separate gate where applicable.
+5. **Merge gate:** Require verified scope, matching reviewed and tested trees, passing CI, independent review PASS, and resolution of blocking findings. Squash merge within the campaign authorization when its gates pass. Otherwise use the task's specific merge authority. Disclose residual risks in the evidence record.
+6. **Native evidence:** When required, apply the campaign dispatch gates, including exact merged SHA, verified owner identity, approved runner and workflow, spending policy and the dispatch budget. Require the actual job and marker evidence and independent verification before progression.
 
 Record the reviewed base SHA and an exact diff fingerprint, the published
 head SHA, review verdict and findings, local and CI test counts and links,
@@ -49,11 +53,12 @@ unverifiable gate cannot be resolved inside the task and repair budget.
 
 ## Post-merge retrospective
 
-Once the owner merges, record the task and PR, reviewed base and head,
-merge SHA, elapsed time to review and CI, repair count, CI failures or
-retries, human interventions, remaining risks, and deferred acceptance work.
-Use actual evidence rather than estimating unobserved outcomes. Keep
-credentials and private logs out of the retrospective.
+After each merge, record the task and PR, reviewed base and head, merge SHA,
+review and CI evidence, repair count, failures or retries, human interventions,
+remaining risks and deferred acceptance work. After each native run, record
+its actual outcome, revision, markers and usage in the [campaign ledger](campaigns/stage4-progress.md).
+Leave a resumable checkpoint when interrupted. Keep credentials and private logs
+out of repository evidence.
 
 ## Ordinary GitHub CI
 
@@ -61,8 +66,8 @@ The **CI** workflow runs on pull requests into `main`. Once GitHub registers
 `workflow_dispatch` from the default branch, use **Actions → CI → Run workflow**
 for a manual run. A newer run cancels an older run for the same ref. The test
 job has a 10-minute timeout. This private repository uses standard GitHub-hosted
-runner minutes. Confirm included capacity and disabled paid overage before
-publishing the PR, since opening it can start CI.
+runner minutes. Apply the established zero-spend policy before opening a PR,
+which can start CI. Stop for evidence of changed spending risk.
 
 The runner checks out the code with read-only repository access and disables
 credential persistence. Setup pulls the pinned Python 3.12 image and downloads

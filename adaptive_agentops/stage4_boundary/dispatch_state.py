@@ -96,8 +96,20 @@ _SCHEMA = (*controller_state._SCHEMA,
 )
 
 
+_EFFECT_SCHEMA_VERSION = 3
+_EFFECT_SCHEMA = (
+    *(ddl.replace("'VALIDATED_NO_EFFECT'", "'SIMULATED_EFFECT_COMMITTED'") for ddl in _SCHEMA),
+    """CREATE TABLE dispatch_effect_evidence (
+    dispatch_id TEXT PRIMARY KEY NOT NULL REFERENCES dispatch_reservations(dispatch_id),
+    request_digest TEXT NOT NULL CHECK (length(request_digest) = 64),
+    effect_number INTEGER CHECK (effect_number > 0)
+) STRICT""",
+)
+
+
 class DispatchStatus(str, Enum):
     VALIDATED_NO_EFFECT = "VALIDATED_NO_EFFECT"
+    SIMULATED_EFFECT_COMMITTED = "SIMULATED_EFFECT_COMMITTED"
     UNKNOWN = "UNKNOWN"
     RESERVED_NO_SEND = "RESERVED_NO_SEND"
 
@@ -141,6 +153,11 @@ class _Permit:
 def provision_dispatch_fixture_state(state_dir: str | Path, control_uid: int) -> None:
     """Provision explicitly empty protected state for the isolated dispatch fixture."""
     controller_state._provision_controller_state(state_dir, control_uid, _SCHEMA, _SCHEMA_VERSION)
+
+
+def provision_effect_fixture_state(state_dir: str | Path, control_uid: int) -> None:
+    """Provision explicitly empty Controller state for the simulated-effect fixture."""
+    controller_state._provision_controller_state(state_dir, control_uid, _EFFECT_SCHEMA, _EFFECT_SCHEMA_VERSION)
 
 
 def _ns(value: datetime) -> int:
@@ -318,7 +335,7 @@ def _envelope(session, fixture, reservation, deadline):
     )
 
 
-def _record_outcome(store, fixture, reservation, status):
+def _record_outcome(store, fixture, reservation, status, receipt=None):
     conn = store._connection
     with store._write():
         store._verify_current_session(fixture.session_id)
@@ -326,27 +343,52 @@ def _record_outcome(store, fixture, reservation, status):
             "SELECT * FROM dispatch_reservations WHERE dispatch_id = ?", (str(reservation.dispatch_id),)
         ).fetchone() != reservation.values:
             raise controller_state.ControllerStateError("Dispatch reservation changed before outcome evidence")
+        if receipt is not None:
+            updated = conn.execute(
+                "UPDATE dispatch_effect_evidence SET effect_number = ? "
+                "WHERE dispatch_id = ? AND request_digest = ? AND effect_number IS NULL",
+                (receipt.effect_number, str(reservation.dispatch_id), receipt.request_digest),
+            )
+            if updated.rowcount != 1:
+                raise controller_state.ControllerStateError("Target receipt differs from the recorded request")
         conn.execute("INSERT INTO dispatch_outcomes VALUES (?, ?)", (str(reservation.dispatch_id), status.value))
         _record(store, fixture.session_id, fixture.action.action_id, reservation.dispatch_id, status.value)
 
 
-def _coordinate(store, session, fixture, endpoint, uids):
+def _record_target_request(store, fixture, key):
+    with store._write():
+        store._verify_current_session(fixture.session_id)
+        store._connection.execute(
+            "INSERT INTO dispatch_effect_evidence VALUES (?, ?, NULL)", (str(key.dispatch_id), key.request_digest),
+        )
+
+
+def _coordinate(store, session, fixture, endpoint, uids, *, simulate=False):
+    if simulate:
+        from . import target_state
+
+    receipt = None
     with _connect_verified(endpoint, uids) as (connection, deadline):
         permit = _reserve_fixture(store, session, fixture, connection, deadline)
         reservation = permit.consume(connection)
         try:
             envelope = _envelope(session, fixture, reservation, deadline)
+            if simulate:
+                _record_target_request(store, fixture, target_state._request_key(envelope))
         except (BoundaryError, TimeoutError, ValueError):
             status = DispatchStatus.RESERVED_NO_SEND
         else:
             try:
-                _exchange_reserved(connection, deadline, envelope, clock=session.clock)
+                if simulate:
+                    receipt = target_state._exchange(connection, deadline, envelope, clock=session.clock)
+                else:
+                    _exchange_reserved(connection, deadline, envelope, clock=session.clock)
             except (BoundaryError, OSError, ValueError):
                 status = DispatchStatus.UNKNOWN
             else:
-                status = DispatchStatus.VALIDATED_NO_EFFECT
+                status = DispatchStatus.SIMULATED_EFFECT_COMMITTED if simulate else DispatchStatus.VALIDATED_NO_EFFECT
     try:
-        _record_outcome(store, fixture, reservation, status)
+        _record_outcome(store, fixture, reservation, status, receipt)
     except controller_state.ControllerStateError:
         return DispatchStatus.UNKNOWN
     return status
@@ -356,16 +398,28 @@ def dispatch_fixture_once(
     state_dir: str | Path, endpoint: Endpoint, uids: TrustedUIDs, *, requester_uid: int, approver_uid: int,
 ) -> DispatchStatus:
     """Internal no-effect fixture entry. Earlier fixture state cannot authorize a new request."""
+    return _dispatch_fixture(state_dir, endpoint, uids, requester_uid, approver_uid, simulate=False)
+
+
+def dispatch_effect_fixture_once(
+    state_dir: str | Path, endpoint: Endpoint, uids: TrustedUIDs, *, requester_uid: int, approver_uid: int,
+) -> DispatchStatus:
+    """Use the isolated effect profile with the same single Controller attempt."""
+    return _dispatch_fixture(state_dir, endpoint, uids, requester_uid, approver_uid, simulate=True)
+
+
+def _dispatch_fixture(state_dir, endpoint, uids, requester_uid, approver_uid, *, simulate):
     _require_dispatch_link(endpoint)
     requester = OperatorIdentity(requester_uid, "local-requester", frozenset({OperatorRole.REQUESTER}))
     approver = OperatorIdentity(approver_uid, LOCAL_APPROVER_ID, frozenset({OperatorRole.APPROVER}))
     if len({requester.uid, approver.uid, uids.agent, uids.control, uids.target}) != 5:
         raise ValueError("Dispatch fixture requires dedicated service, requester and approver UIDs")
     with controller_state._open_controller_state(
-        state_dir, uids.control, schema=_SCHEMA, version=_SCHEMA_VERSION,
+        state_dir, uids.control, schema=_EFFECT_SCHEMA if simulate else _SCHEMA,
+        version=_EFFECT_SCHEMA_VERSION if simulate else _SCHEMA_VERSION,
     ) as store:
         _require_unused(store)
         session = delegation._Session(uids.agent, None)
         store.start(session, uids.control, uids.agent, (requester, approver), _TOOL, _RESOURCE)
         fixture = _prepare_fixture(store, session, endpoint, uids, requester.uid, approver.uid)
-        return _coordinate(store, session, fixture, endpoint, uids)
+        return _coordinate(store, session, fixture, endpoint, uids, simulate=simulate)

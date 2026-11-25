@@ -390,3 +390,13 @@ def test_stage45_scope_requires_the_complete_cumulative_source_allowlist(tmp_pat
     assert {
         path.relative_to(stage).as_posix() for path in stage.rglob("*") if path.is_file()
     } == set(setup.STAGE45_SOURCES) | set(WHEELS)
+
+
+def test_stage46_staging_requires_the_explicit_cumulative_scope(tmp_path):
+    with pytest.raises(RuntimeError, match="missing reviewed source"):
+        setup.stage_bundle(make_bundle(sources=setup.STAGE45_SOURCES), tmp_path, setup.STAGE46_SOURCES)
+    assert not list(tmp_path.iterdir())
+    setup.stage_bundle(make_bundle(sources=setup.STAGE46_SOURCES), tmp_path, setup.STAGE46_SOURCES)
+    assert {
+        path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*") if path.is_file()
+    } == set(setup.STAGE46_SOURCES) | set(WHEELS)

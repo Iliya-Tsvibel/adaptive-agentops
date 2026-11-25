@@ -14,7 +14,6 @@ from . import BoundaryError, _check_ancestor, _reject_acls, _require_local_uid
 
 
 DATABASE_NAME = "controller.sqlite3"
-_JOURNAL = DATABASE_NAME + "-journal"
 _APPLICATION_ID = 0x41414F34
 _SCHEMA_VERSION = 1
 _MAX_SESSIONS = 256
@@ -129,22 +128,23 @@ def _private_file(directory_fd: int, name: str, control_uid: int):
         os.close(fd)
 
 
-def _verified_files(directory_fd: int, control_uid: int):
+def _verified_files(directory_fd: int, control_uid: int, filename: str):
+    journal = filename + "-journal"
     entries = set(os.listdir(directory_fd))
-    if entries not in ({DATABASE_NAME}, {DATABASE_NAME, _JOURNAL}):
+    if entries not in ({filename}, {filename, journal}):
         raise ControllerStateError("Controller database is missing or its state directory contains foreign entries")
-    identity = _private_file(directory_fd, DATABASE_NAME, control_uid)
-    if _JOURNAL in entries:
-        _private_file(directory_fd, _JOURNAL, control_uid)
+    identity = _private_file(directory_fd, filename, control_uid)
+    if journal in entries:
+        _private_file(directory_fd, journal, control_uid)
     return identity
 
 
 @contextmanager
-def _database(directory_fd: int, control_uid: int):
-    identity = _verified_files(directory_fd, control_uid)
+def _database(directory_fd: int, control_uid: int, filename: str = DATABASE_NAME):
+    identity = _verified_files(directory_fd, control_uid, filename)
     # Retain the pinned protected directory for the duration of the connection.
     # SQLite opens the database and its rollback journal under this directory.
-    uri = Path(f"/proc/self/fd/{directory_fd}/{DATABASE_NAME}").as_uri() + "?mode=rw"
+    uri = Path(f"/proc/self/fd/{directory_fd}/{filename}").as_uri() + "?mode=rw"
     try:
         with closing(sqlite3.connect(uri, uri=True, timeout=0, isolation_level=None)) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
@@ -158,16 +158,16 @@ def _database(directory_fd: int, control_uid: int):
                 "journal_mode": ("delete",), "foreign_keys": (1,), "trusted_schema": (0,), "synchronous": (3,),
             }:
                 raise ControllerStateError("Controller database requires DELETE journaling and durable secure settings")
-            if _verified_files(directory_fd, control_uid) != identity:
+            if _verified_files(directory_fd, control_uid, filename) != identity:
                 raise ControllerStateError("Controller database changed during open")
             yield connection
     except sqlite3.Error:
         raise ControllerStateError("Controller database is unavailable or corrupt") from None
 
 
-def _verify_schema(connection: sqlite3.Connection, schema, version):
+def _verify_schema_metadata(connection: sqlite3.Connection, schema, version, application_id):
     if (
-        connection.execute("PRAGMA application_id").fetchone() != (_APPLICATION_ID,)
+        connection.execute("PRAGMA application_id").fetchone() != (application_id,)
         or connection.execute("PRAGMA user_version").fetchone() != (version,)
         or {sql for (sql,) in connection.execute("SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL")} != set(schema)
     ):
@@ -177,6 +177,8 @@ def _verify_schema(connection: sqlite3.Connection, schema, version):
         or connection.execute("PRAGMA foreign_key_check").fetchone() is not None
     ):
         raise ControllerStateError("Controller database failed integrity checks")
+def _verify_schema(connection: sqlite3.Connection, schema, version):
+    _verify_schema_metadata(connection, schema, version, _APPLICATION_ID)
     if connection.execute(
         "SELECT 1 FROM controller_grants AS g JOIN controller_sessions AS s USING(session_id) "
         "WHERE g.state = 'ACTIVE' AND s.state != 'ACTIVE' LIMIT 1"
@@ -193,25 +195,34 @@ def provision_controller_state(state_dir: str | Path, control_uid: int):
 
 
 def _provision_controller_state(state_dir, control_uid, schema, version):
+    _provision_state(
+        state_dir, control_uid, DATABASE_NAME, schema, version, _APPLICATION_ID,
+        lambda connection: _verify_schema(connection, schema, version),
+    )
+
+
+def _provision_state(state_dir, control_uid, filename, schema, version, application_id, verify, initialize=None):
     with _state_lease(state_dir, control_uid) as directory_fd:
         if os.listdir(directory_fd):
             raise ControllerStateError("Controller state provisioning requires an empty directory")
         fd = os.open(
-            DATABASE_NAME, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+            filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
             mode=0o600, dir_fd=directory_fd,
         )
         try:
             os.fchmod(fd, 0o600)
         finally:
             os.close(fd)
-        with _database(directory_fd, control_uid) as connection:
+        with _database(directory_fd, control_uid, filename) as connection:
             connection.execute("BEGIN IMMEDIATE")
             for ddl in schema:
                 connection.execute(ddl)
-            connection.execute(f"PRAGMA application_id = {_APPLICATION_ID}")
+            if initialize is not None:
+                initialize(connection)
+            connection.execute(f"PRAGMA application_id = {application_id}")
             connection.execute(f"PRAGMA user_version = {version}")
             _commit(connection)
-            _verify_schema(connection, schema, version)
+            verify(connection)
         os.fsync(directory_fd)
 
 

@@ -1,6 +1,10 @@
 # Stage 4.5 native acceptance plan
 
-**Native evidence and formal owner acceptance are pending.**
+**Native PASS at `6d618afd6bd33328ef9ecda0a99e023a86afaa8b`.
+Formal owner acceptance is pending.**
+[Independent evidence checkpoint](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/21)
+· [Native job](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45681467288/job/139442818846)
+
 [OS-bound dispatch contract](tasks/stage4/4.5-os-bound-dispatch-contract.md)
 · [Stage 4.4 native acceptance plan](stage44-native-acceptance.md)
 

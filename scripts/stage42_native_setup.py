@@ -31,6 +31,8 @@ STAGE43_SOURCES = SOURCES + (
     "scripts/stage43_native_probe.py",
 )
 DRIVER = "scripts/stage42_native_acceptance.py"
+CODE_PARENT = Path("/var/lib")
+SOCKET_PARENT = Path("/run")
 WHEEL_NAME = re.compile(
     r"(annotated_types|pydantic|pydantic_core|typing_extensions|typing_inspection)"
     r"-[a-zA-Z0-9_.-]{1,180}\.whl"
@@ -131,13 +133,24 @@ def stage_bundle(source, stage, sources=SOURCES):
         stage.chmod(0o755)
 
 
-def run_offline(source, run_parent, *, stage43=False):
-    # Check the ancestors in order. Neither permits an unprivileged rename or replacement.
-    validate_directory(run_parent.parent)
-    validate_directory(run_parent)
-    require("system.posix_acl_default" not in os.listxattr(run_parent, follow_symlinks=False),
-            "/run: unexpected default ACL on staging parent")
-    with TemporaryDirectory(prefix="aao-stage42-code.", dir=run_parent) as directory:
+def validate_parent(parent, *, executable):
+    # Check ancestors before walking their descendants. All names stay protected
+    # from unprivileged rename and replacement throughout staging and cleanup.
+    for path in reversed(parent.parents):
+        validate_directory(path)
+    validate_directory(parent)
+    require("system.posix_acl_default" not in os.listxattr(parent, follow_symlinks=False),
+            f"{parent}: unexpected default ACL on acceptance parent")
+    flags = os.statvfs(parent).f_flag
+    require(not flags & os.ST_RDONLY, f"{parent}: acceptance parent is on a read-only mount")
+    if executable:
+        require(not flags & os.ST_NOEXEC, f"{parent}: native dependencies require a mount without noexec")
+
+
+def run_offline(source, code_parent, *, stage43=False):
+    validate_parent(code_parent, executable=True)
+    validate_parent(SOCKET_PARENT, executable=False)
+    with TemporaryDirectory(prefix="aao-stage42-code.", dir=code_parent) as directory:
         stage = Path(directory)
         validate_directory(stage, 0o700)
         if stage43:
@@ -167,7 +180,7 @@ def main():
                 "Expected isolated root setup in the acceptance namespace")
         signal.signal(signal.SIGTERM, interrupted)
         os.umask(0o077)
-        return run_offline(sys.stdin.buffer, Path("/run"), stage43=command == ["run-stage43"])
+        return run_offline(sys.stdin.buffer, CODE_PARENT, stage43=command == ["run-stage43"])
     except (RuntimeError, OSError, BadZipFile, subprocess.CalledProcessError, KeyboardInterrupt) as error:
         if isinstance(error, OSError):
             detail = f"filesystem or process operation failed (errno={error.errno})"

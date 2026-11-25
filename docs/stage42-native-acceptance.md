@@ -27,20 +27,30 @@ The failed run stopped at the original staging metadata guard before either
 IPC harness started. The recorded Ubuntu image's build recipe sets `/opt`
 to mode `0777`, which explains the expected parent-mode failure. The job
 did not log the observed metadata, so the exact failed predicate on that VM
-remains unconfirmed. The workflow now uses `/run`, Linux's transient runtime
-directory. [Failed run](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45604533282)
+remains unconfirmed. A corrected run subsequently passed with staging under
+`/run`. [Failed run](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45604533282)
 · [Runner image build recipe](https://github.com/actions/runner-images/blob/ubuntu24/20261116.376/images/ubuntu/scripts/build/configure-system.sh#L19)
 
-Before writing below `/run`, the setup program checks `/` and `/run` without
-following final symlinks and requires root ownership, search access for the
-probe UIDs, and no group or other write access. It rejects an inherited default ACL and atomically creates a
-private staging directory. Allowlisted files are created exclusively inside
+During Stage 4.3 integration, a different runner completed the five Stage 4.1
+checks but failed to map the executable segment of the staged
+`pydantic_core` extension from `/run`. A noexec mount or equivalent runtime
+restriction is consistent with the error. The job did not record the mount
+flags, so its exact cause remains unconfirmed. The workflow now stages code and
+wheels under `/var/lib`, using `/run` for sockets. [Integration run](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45614418616)
+
+Before creating any staging directory, the setup program validates protected
+root-owned ancestors for both parents without following final symlinks. It
+requires search access for probe UIDs, denies group or other write access
+and default ACLs, requires writable mounts, and rejects a noexec code mount.
+It then atomically creates a private staging directory. Allowlisted files are created exclusively inside
 that directory. The directory becomes traversable for service UIDs only
 after staging, with root-owned read-only source and private wheel inputs.
 Protected ancestors keep unprivileged users from swapping the checked names
 between validation and use. The driver independently checks the staging
-metadata before importing staged code and revalidates dependencies before
-any security probe. The design trusts the approved commit, workflow,
+metadata and mount flags before importing staged code. After wheel revalidation,
+an isolated subprocess running as the unprivileged Control Plane UID checks
+that the shared extension loads from the staged dependencies. An incompatible
+mount or loader fails during setup before security probes emit markers. The design trusts the approved commit, workflow,
 disposable runner administrator, system Python, and kernel.
 
 The root orchestrator uses the standard library. It verifies the staged

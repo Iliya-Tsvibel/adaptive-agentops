@@ -165,11 +165,11 @@ def _database(directory_fd: int, control_uid: int):
         raise ControllerStateError("Controller database is unavailable or corrupt") from None
 
 
-def _verify_schema(connection: sqlite3.Connection):
+def _verify_schema(connection: sqlite3.Connection, schema, version):
     if (
         connection.execute("PRAGMA application_id").fetchone() != (_APPLICATION_ID,)
-        or connection.execute("PRAGMA user_version").fetchone() != (_SCHEMA_VERSION,)
-        or {sql for (sql,) in connection.execute("SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL")} != set(_SCHEMA)
+        or connection.execute("PRAGMA user_version").fetchone() != (version,)
+        or {sql for (sql,) in connection.execute("SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL")} != set(schema)
     ):
         raise ControllerStateError("Controller database has an unexpected application ID, schema or version")
     if (
@@ -189,6 +189,10 @@ def _verify_schema(connection: sqlite3.Connection):
 
 def provision_controller_state(state_dir: str | Path, control_uid: int):
     """Initialize an existing empty service-private directory explicitly."""
+    _provision_controller_state(state_dir, control_uid, _SCHEMA, _SCHEMA_VERSION)
+
+
+def _provision_controller_state(state_dir, control_uid, schema, version):
     with _state_lease(state_dir, control_uid) as directory_fd:
         if os.listdir(directory_fd):
             raise ControllerStateError("Controller state provisioning requires an empty directory")
@@ -202,12 +206,12 @@ def provision_controller_state(state_dir: str | Path, control_uid: int):
             os.close(fd)
         with _database(directory_fd, control_uid) as connection:
             connection.execute("BEGIN IMMEDIATE")
-            for ddl in _SCHEMA:
+            for ddl in schema:
                 connection.execute(ddl)
             connection.execute(f"PRAGMA application_id = {_APPLICATION_ID}")
-            connection.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+            connection.execute(f"PRAGMA user_version = {version}")
             _commit(connection)
-            _verify_schema(connection)
+            _verify_schema(connection, schema, version)
         os.fsync(directory_fd)
 
 
@@ -395,8 +399,8 @@ class _ControllerStore:
 
 
 @contextmanager
-def _open_controller_state(state_dir, control_uid):
+def _open_controller_state(state_dir, control_uid, *, schema=_SCHEMA, version=_SCHEMA_VERSION):
     with _state_lease(state_dir, control_uid) as directory_fd:
         with _database(directory_fd, control_uid) as connection:
-            _verify_schema(connection)
+            _verify_schema(connection, schema, version)
             yield _ControllerStore(connection)

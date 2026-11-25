@@ -68,7 +68,7 @@ def server(delegation, endpoint, uids, scenario, verify_effects):
     print(json.dumps(evidence))
 
 
-def effect_guard(*additional_modules, sqlite_database=None):
+def effect_guard(*additional_modules, sqlite_database=None, unix_peer=None):
     allowed_modules = {
         "adaptive_agentops.identity", "adaptive_agentops.policy", "adaptive_agentops.tool_requests",
         "adaptive_agentops.stage4_boundary", "adaptive_agentops.stage4_boundary.delegation",
@@ -76,7 +76,8 @@ def effect_guard(*additional_modules, sqlite_database=None):
     }
     violations = []
     blocked = {
-        "socket.connect", "socket.sendto", "socket.getaddrinfo", "sqlite3.connect",
+        "socket.connect", "socket.sendto", "socket.sendmsg", "socket.sendmsg_afalg",
+        "socket.getaddrinfo", "sqlite3.connect",
         "subprocess.Popen", "os.system", "os.exec", "os.fork", "os.posix_spawn",
     }
 
@@ -84,6 +85,16 @@ def effect_guard(*additional_modules, sqlite_database=None):
         return name.startswith("adaptive_agentops.") and name not in allowed_modules
 
     def forbid_effects(event, args):
+        if event == "socket.connect" and unix_peer is not None and len(args) == 2:
+            connection, address = args
+            if (getattr(connection, "family", None) == socket.AF_UNIX
+                    and getattr(connection, "type", None) == socket.SOCK_STREAM
+                    and type(address) is str and address.startswith("/")):
+                try:
+                    if Path(address).resolve() == unix_peer:
+                        return
+                except (ValueError, OSError, RuntimeError):
+                    pass
         if (event == "sqlite3.connect" and sqlite_database is not None
                 and len(args) == 1 and type(args[0]) is str):
             try:

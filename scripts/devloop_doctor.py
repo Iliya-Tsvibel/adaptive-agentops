@@ -18,9 +18,11 @@ STAGE41 = "docs/stage4-native-acceptance.md"
 STAGE42 = "docs/stage42-native-acceptance.md"
 STAGE43 = "docs/stage43-native-acceptance.md"
 STAGE44 = "docs/stage44-native-acceptance.md"
+STAGE45 = "docs/stage45-native-acceptance.md"
 CONTRACT42 = "docs/tasks/stage4/4.2-scoped-delegation-contract.md"
 CONTRACT43 = "docs/tasks/stage4/4.3-operator-delegation-contract.md"
 CONTRACT44 = "docs/tasks/stage4/4.4-protected-controller-state-contract.md"
+CONTRACT45 = "docs/tasks/stage4/4.5-os-bound-dispatch-contract.md"
 APPROVED_SOURCE = "4cbbc0f325ad1cfc427008c6b55d314355b19550"
 ADR_BLOB = "b8a5653a32b95c966d47d79f05907f4aa3fb4f46"
 REPOSITORY = "Iliya-Tsvibel/adaptive-agentops"
@@ -32,7 +34,7 @@ REQUIRED_LINKS = {
     "SECURITY.md": {ARCHITECTURE, LOOP, CONTRACT42, "docs/stage2-security.md"},
     LOOP: {"AGENTS.md", "SECURITY.md", ARCHITECTURE, STAGE41, CONTRACT42, CAMPAIGN, LEDGER},
     CAMPAIGN: {ADR, ARCHITECTURE, LEDGER, LOOP, STAGE43, "SECURITY.md"},
-    LEDGER: {CAMPAIGN, ADR, STAGE41, CONTRACT42, STAGE43, CONTRACT44, STAGE44},
+    LEDGER: {CAMPAIGN, ADR, STAGE41, CONTRACT42, STAGE43, CONTRACT44, STAGE44, CONTRACT45, STAGE45},
     ARCHITECTURE: {ADR, STAGE41, STAGE42, CONTRACT42, "docs/stage2-security.md",
                    "docs/stage3-acceptance.md"},
     ADR: {ARCHITECTURE, STAGE41, CONTRACT42},
@@ -41,6 +43,8 @@ REQUIRED_LINKS = {
     CONTRACT43: {ADR, CONTRACT42},
     STAGE44: {CONTRACT44, STAGE43},
     CONTRACT44: {ADR, CONTRACT43, CAMPAIGN},
+    STAGE45: {CONTRACT45, STAGE44},
+    CONTRACT45: {ADR, CAMPAIGN},
 }
 DOCS = sorted(set(REQUIRED_LINKS) | {
     STAGE42, CONTRACT42, "docs/stage2-security.md", "docs/stage3-acceptance.md",

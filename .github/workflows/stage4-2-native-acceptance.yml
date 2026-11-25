@@ -2,6 +2,12 @@ name: Stage 4.2 native Linux acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      include_stage43:
+        description: Include Stage 4.3 operator IPC and delegation lifecycle
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -56,14 +62,21 @@ jobs:
             download --index-url https://pypi.org/simple --only-binary=:all: --require-hashes \
             --dest "$RUNNER_TEMP/stage42-wheels" -r "$RUNNER_TEMP/stage42-wheels/requirements.txt"
 
-      - name: Stage and run both IPC acceptance slices offline under distinct UIDs
+      - name: Stage and run the selected IPC acceptance slices offline under distinct UIDs
+        env:
+          INCLUDE_STAGE43: ${{ inputs.include_stage43 }}
         run: |
+          case "$INCLUDE_STAGE43" in
+            true) pack=pack-stage43; run=run-stage43 ;;
+            false) pack=pack; run=run ;;
+            *) echo "Invalid native acceptance scope" >&2; exit 1 ;;
+          esac
           if ! setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py"); then
             echo "::error title=Stage 4.2 setup failure::Reviewed setup source unavailable"
             exit 1
           fi
           set +e
-          /usr/bin/python3.12 -I -B -S -c "$setup" pack "$GITHUB_SHA" "$RUNNER_TEMP/stage42-wheels" |
+          /usr/bin/python3.12 -I -B -S -c "$setup" "$pack" "$GITHUB_SHA" "$RUNNER_TEMP/stage42-wheels" |
             sudo -n /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
               /usr/bin/timeout --signal=INT --kill-after=5s 180s \
               /usr/bin/unshare --net -- /usr/bin/sh -ec '
@@ -71,8 +84,8 @@ jobs:
                   echo "::error title=Stage 4.2 setup failure::Could not initialize isolated loopback" >&2
                   exit 1
                 fi
-                exec /usr/bin/python3.12 -I -B -S -c "$1" run
-              ' sh "$setup"
+                exec /usr/bin/python3.12 -I -B -S -c "$1" "$2"
+              ' sh "$setup" "$run"
           statuses=("${PIPESTATUS[@]}")
           if [[ ${statuses[0]} -ne 0 || ${statuses[1]} -ne 0 && ${statuses[1]} -ne 79 ]]; then
             echo "::error title=Stage 4.2 infrastructure failure::Runner setup or execution infrastructure failed (pack=${statuses[0]}, run=${statuses[1]})"

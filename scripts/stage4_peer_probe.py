@@ -21,7 +21,7 @@ from adaptive_agentops.stage4_boundary import (
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("listen", "connect"))
-    parser.add_argument("--link", required=True, choices=[link.value for link in Link])
+    parser.add_argument("--link", required=True, choices=(Link.AGENT_CONTROL.value, Link.CONTROL_TARGET.value))
     parser.add_argument("--socket", required=True, help="absolute path in a preprovisioned directory")
     parser.add_argument("--access-gid", required=True, type=int)
     parser.add_argument("--agent-uid", required=True, type=int)

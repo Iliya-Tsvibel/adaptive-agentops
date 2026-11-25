@@ -67,10 +67,11 @@ def server(delegation, endpoint, uids, scenario, verify_effects):
     print(json.dumps(evidence))
 
 
-def effect_guard():
+def effect_guard(*additional_modules):
     allowed_modules = {
         "adaptive_agentops.identity", "adaptive_agentops.policy", "adaptive_agentops.tool_requests",
         "adaptive_agentops.stage4_boundary", "adaptive_agentops.stage4_boundary.delegation",
+        *additional_modules,
     }
     violations = []
     blocked = {

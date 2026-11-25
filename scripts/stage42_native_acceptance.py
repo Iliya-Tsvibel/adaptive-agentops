@@ -21,6 +21,8 @@ PACKAGES = frozenset({
 PIN = re.compile(r"([a-z-]+)==[0-9]+(?:\.[0-9]+)+ --hash=sha256:([0-9a-f]{64})")
 FRAME = b'AAO\x02\x01{"tool":"mock.get_health","resource":"demo-api","arguments":{}}'
 STAGE = Path(__file__).absolute().parents[1]
+CODE_PARENT = Path("/var/lib")
+SOCKET_PARENT = Path("/run")
 SETUP_FAILED = 78
 PROBE_FAILED = 79
 
@@ -203,8 +205,9 @@ def check_evidence_failure(legacy, path):
 
 
 def validate_staging(stage):
-    for path, exact_mode in ((stage.parent.parent, None), (stage.parent, None),
-                             (stage, 0o755), (stage / "wheels", 0o700)):
+    directories = [(path, None) for path in reversed(stage.parents)]
+    directories.extend(((stage, 0o755), (stage / "wheels", 0o700), (SOCKET_PARENT, None)))
+    for path, exact_mode in directories:
         try:
             info = path.lstat()
         except OSError as error:
@@ -219,21 +222,40 @@ def validate_staging(stage):
 
 
 def prepare():
-    require(os.geteuid() == 0 and STAGE.parent == Path("/run")
+    require(os.geteuid() == 0 and STAGE.parent == CODE_PARENT
             and STAGE.name.startswith("aao-stage42-code.") and sys.flags.isolated
             and sys.flags.no_site and sys.flags.dont_write_bytecode,
-            "Expected isolated root driver in /run staging")
+            "Expected isolated root driver in /var/lib staging")
     validate_staging(STAGE)
-    require("system.posix_acl_default" not in os.listxattr(STAGE, follow_symlinks=False),
-            "Staging directory has an unexpected default ACL")
+    for path in (STAGE, SOCKET_PARENT):
+        require("system.posix_acl_default" not in os.listxattr(path, follow_symlinks=False),
+                f"{path}: unexpected default ACL")
+        flags = os.statvfs(path).f_flag
+        require(not flags & os.ST_RDONLY, f"{path}: read-only acceptance mount")
+        if path == STAGE:
+            require(not flags & os.ST_NOEXEC, f"{path}: native dependencies require a mount without noexec")
     require(Path.cwd() == STAGE, "Expected working directory to match the validated staging directory")
     os.umask(0o022)
     extract_wheels(STAGE / "wheels", STAGE / "deps", dependency_pins(STAGE / ".github/ci-requirements.txt"))
 
 
+def verify_dependency_runtime(legacy):
+    result = subprocess.run(
+        probe("dependency-preflight", STAGE), **legacy.identity(legacy.CONTROL),
+        capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=5,
+    )
+    if result.returncode != 0 or result.stdout != "DEPENDENCIES_READY\n" or result.stderr:
+        reason = (
+            "shared object executable segment could not be mapped"
+            if "failed to map segment from shared object" in result.stderr
+            else "isolated dependency import did not complete"
+        )
+        raise RuntimeError(f"Native dependency preflight failed: {reason} (exit={result.returncode})")
+
+
 @contextmanager
 def proposal_socket(legacy):
-    with TemporaryDirectory(prefix="aao-stage42-", dir="/run") as directory:
+    with TemporaryDirectory(prefix="aao-stage42-", dir=SOCKET_PARENT) as directory:
         root = Path(directory)
         root.chmod(0o755)
         socket_dir = root / "agent"
@@ -250,14 +272,17 @@ def run(*, stage43=False):
             from scripts import stage4_native_acceptance as legacy
 
             legacy_paths = resources.enter_context(legacy.prepare_native())
+            verify_dependency_runtime(legacy)
             path = resources.enter_context(proposal_socket(legacy))
             if stage43:
                 from scripts import stage43_native_acceptance
 
                 managed_paths = resources.enter_context(stage43_native_acceptance.prepare(legacy))
-        except (RuntimeError, OSError, BadZipFile, UnicodeError, ImportError) as error:
+        except (RuntimeError, OSError, BadZipFile, UnicodeError, ImportError, subprocess.TimeoutExpired) as error:
             if isinstance(error, OSError):
                 detail = f"setup filesystem or process operation failed (errno={error.errno})"
+            elif isinstance(error, subprocess.TimeoutExpired):
+                detail = "native dependency preflight exceeded its five-second timeout"
             elif isinstance(error, (BadZipFile, UnicodeError, ImportError)):
                 detail = f"setup input rejected ({type(error).__name__})"
             else:

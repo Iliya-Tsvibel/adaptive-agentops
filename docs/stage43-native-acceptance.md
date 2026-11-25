@@ -16,8 +16,9 @@ competing privileged run. Check GitHub-hosted x86-64 Ubuntu 24.04, first
 attempt, owner-only workflow guard, read-only contents, native Linux outside
 WSL and containers, and the existing five-minute job and 180-second offline
 phase limits. Root runs only the audited setup in the isolated runner. It
-validates the protected staging parent, verifies the existing hash-pinned
-wheels, sets up the separate directories and dedicated temporary UIDs/GIDs,
+validates the protected executable code mount and socket parent, verifies
+the existing hash-pinned wheels, checks dependency loading under the Control
+Plane UID, sets up the separate directories and dedicated temporary UIDs/GIDs,
 and conducts all security probes inside a loopback-only network namespace.
 
 ```bash

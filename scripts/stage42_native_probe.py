@@ -148,7 +148,13 @@ def main():
 
     endpoint = Endpoint(Link.AGENT_CONTROL, path, legacy.PROPOSERS)
     uids = TrustedUIDs(legacy.AGENT, legacy.CONTROL, legacy.TARGET)
-    if mode == "server" and len(args) == 1:
+    if mode == "dependency-preflight" and not args:
+        from pydantic_core import _pydantic_core
+
+        if not Path(_pydantic_core.__file__).is_relative_to(stage / "deps"):
+            raise RuntimeError("Native dependency did not load from staged wheels")
+        print("DEPENDENCIES_READY")
+    elif mode == "server" and len(args) == 1:
         server(delegation, endpoint, uids, args[0], verify_effects)
     elif mode == "client" and len(args) <= 1:
         proposal = MockGetHealthProposal(tool="mock.get_health", resource=args[0] if args else "demo-api",

@@ -1,4 +1,5 @@
 from io import BytesIO
+import os
 from pathlib import Path
 import stat
 from types import SimpleNamespace
@@ -40,7 +41,7 @@ def make_bundle(*, omit=None, extra=None, sources=setup.SOURCES):
 ])
 def test_parent_and_driver_require_safe_metadata(monkeypatch, uid, gid, mode, diagnostic):
     info = SimpleNamespace(st_uid=uid, st_gid=gid, st_mode=mode)
-    parent, stage = Path("/run"), Path("/run/aao-stage42-code.fixture")
+    parent, stage = Path("/var/lib"), Path("/var/lib/aao-stage42-code.fixture")
 
     def metadata(path):
         if path == parent:
@@ -77,7 +78,7 @@ def test_parent_rejection_precedes_staging_or_launch(monkeypatch, tmp_path):
     monkeypatch.setattr(setup, "validate_directory", validate)
     with pytest.raises(RuntimeError, match="Unsafe parent fixture"):
         setup.run_offline(make_bundle(), tmp_path)
-    assert examined == [tmp_path.parent, tmp_path]
+    assert examined == [*reversed(tmp_path.parents), tmp_path]
     assert list(tmp_path.iterdir()) == []
 
 
@@ -128,6 +129,7 @@ def test_pack_rejects_symlink_wheel(monkeypatch, tmp_path):
 
 
 def test_partial_staging_failure_cleans_up(monkeypatch, tmp_path):
+    monkeypatch.setattr(setup, "SOCKET_PARENT", tmp_path)
     def fail_copy(source, stage):
         (stage / "partial").touch()
         raise OSError("copy fixture failed")
@@ -141,6 +143,7 @@ def test_partial_staging_failure_cleans_up(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize(("child_status", "expected"), [(0, 0), (78, 78), (79, 79), (1, 78)])
 def test_driver_status_and_cleanup(monkeypatch, tmp_path, child_status, expected):
+    monkeypatch.setattr(setup, "SOCKET_PARENT", tmp_path)
     def launch(command, *, cwd, stdin):
         assert command[1:4] == ("-I", "-B", "-S")
         assert Path(command[4]) == cwd / setup.DRIVER
@@ -237,6 +240,7 @@ def test_probe_start_follows_both_native_setups(monkeypatch, capsys, failure):
     monkeypatch.setattr(driver.sys, "path", driver.sys.path.copy())
     monkeypatch.setattr(driver, "prepare", lambda: None)
     monkeypatch.setattr(legacy, "prepare_native", prepare_legacy)
+    monkeypatch.setattr(driver, "verify_dependency_runtime", lambda _legacy: None)
     monkeypatch.setattr(driver, "proposal_socket", prepare_proposal)
     monkeypatch.setattr(legacy, "run_probes", lambda agent, target: actions.append((agent, target)))
     for check in ("check_live_session", "check_denials", "check_wrong_server", "check_evidence_failure"):
@@ -271,3 +275,94 @@ def test_stage43_is_an_explicit_exact_native_source_allowlist(tmp_path):
     assert {
         path.relative_to(baseline).as_posix() for path in baseline.rglob("*") if path.is_file()
     } == set(setup.STAGE43_SOURCES) | set(WHEELS)
+
+
+@pytest.mark.parametrize(("code_flags", "socket_flags", "message"), [
+    (os.ST_NOEXEC, 0, "native dependencies require a mount without noexec"),
+    (os.ST_RDONLY, 0, "read-only mount"),
+    (0, os.ST_RDONLY, "read-only mount"),
+    (0, os.ST_NOEXEC, None),
+])
+def test_mount_requirements_distinguish_executable_code_from_socket_storage(
+    monkeypatch, tmp_path, code_flags, socket_flags, message,
+):
+    codes = tmp_path / "code"
+    sockets = tmp_path / "sockets"
+    codes.mkdir()
+    sockets.mkdir()
+    checked = []
+    monkeypatch.setattr(setup, "SOCKET_PARENT", sockets)
+    monkeypatch.setattr(setup, "validate_directory", lambda path, exact_mode=None: checked.append(path))
+    monkeypatch.setattr(setup.os, "statvfs", lambda path: SimpleNamespace(
+        f_flag=code_flags if path == codes else socket_flags,
+    ))
+    if message:
+        with pytest.raises(RuntimeError, match=message):
+            setup.run_offline(make_bundle(), codes)
+    else:
+        monkeypatch.setattr(setup.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=0))
+        assert setup.run_offline(make_bundle(), codes) == 0
+        assert sockets in checked
+    assert not list(codes.iterdir())
+    assert not list(sockets.iterdir())
+
+
+@pytest.mark.parametrize("flags", [os.ST_NOEXEC, os.ST_RDONLY])
+def test_driver_independently_rejects_unsuitable_code_mount_before_extracting(monkeypatch, flags):
+    stage = Path("/var/lib/aao-stage42-code.fixture")
+    monkeypatch.setattr(driver, "STAGE", stage)
+    monkeypatch.setattr(driver.sys, "flags", SimpleNamespace(isolated=1, no_site=1, dont_write_bytecode=1))
+    monkeypatch.setattr(driver.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(driver, "validate_staging", lambda _stage: None)
+    monkeypatch.setattr(driver.os, "listxattr", lambda *args, **kwargs: [])
+    monkeypatch.setattr(driver.os, "statvfs", lambda _path: SimpleNamespace(f_flag=flags))
+    with pytest.raises(RuntimeError, match="without noexec|read-only acceptance mount"):
+        driver.prepare()
+
+
+@pytest.mark.parametrize("exception", [RuntimeError, driver.subprocess.TimeoutExpired])
+def test_dependency_preflight_failure_precedes_all_probe_markers_and_unwinds(monkeypatch, capsys, exception):
+    from contextlib import contextmanager
+    from scripts import stage4_native_acceptance as legacy
+
+    actions = []
+
+    @contextmanager
+    def prepare_legacy():
+        actions.append("legacy setup")
+        try:
+            yield "agent", "target"
+        finally:
+            actions.append("legacy cleanup")
+
+    def dependency_failure(_legacy):
+        actions.append("dependency preflight")
+        if exception is driver.subprocess.TimeoutExpired:
+            raise exception("fixture", 5)
+        raise exception("Native dependency preflight failed: shared object executable segment could not be mapped")
+
+    monkeypatch.setattr(driver.sys, "path", driver.sys.path.copy())
+    monkeypatch.setattr(driver, "prepare", lambda: None)
+    monkeypatch.setattr(legacy, "prepare_native", prepare_legacy)
+    monkeypatch.setattr(driver, "verify_dependency_runtime", dependency_failure)
+    assert driver.run(stage43=True) == setup.SETUP_FAILED
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "Stage 4.2 setup failure" in output.err
+    assert "preflight" in output.err
+    assert actions == ["legacy setup", "dependency preflight", "legacy cleanup"]
+
+
+def test_loader_preflight_runs_with_isolated_unprivileged_control_identity(monkeypatch):
+    from scripts import stage4_native_acceptance as legacy
+
+    def run(command, **kwargs):
+        assert command[1:4] == ("-I", "-B", "-S")
+        assert command[5] == "dependency-preflight"
+        assert kwargs["user"] == kwargs["group"] == legacy.CONTROL
+        assert kwargs["env"] == {} and kwargs["timeout"] == 5
+        return SimpleNamespace(returncode=1, stdout="", stderr="failed to map segment from shared object")
+
+    monkeypatch.setattr(driver.subprocess, "run", run)
+    with pytest.raises(RuntimeError, match="shared object executable segment could not be mapped"):
+        driver.verify_dependency_runtime(legacy)

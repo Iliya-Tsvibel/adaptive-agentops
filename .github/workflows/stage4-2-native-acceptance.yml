@@ -31,6 +31,7 @@ jobs:
 
       - name: Download hash-pinned wheels as the runner user
         run: |
+          trap 'if [[ $? -ne 0 ]]; then echo "::error title=Stage 4.2 setup failure::Runner preflight or wheel download failed" >&2; fi' EXIT
           test "$RUNNER_ENVIRONMENT" = github-hosted
           test "$(uname -s)" = Linux
           test "$(uname -m)" = x86_64
@@ -55,29 +56,26 @@ jobs:
             download --index-url https://pypi.org/simple --only-binary=:all: --require-hashes \
             --dest "$RUNNER_TEMP/stage42-wheels" -r "$RUNNER_TEMP/stage42-wheels/requirements.txt"
 
-      - name: Run both IPC acceptance slices offline under distinct UIDs
+      - name: Stage and run both IPC acceptance slices offline under distinct UIDs
         run: |
-          staging=$(sudo -n mktemp -d /opt/aao-stage42-code.XXXXXXXX)
-          trap 'sudo -n rm -rf -- "$staging"' EXIT
-          for file in .github/ci-requirements.txt adaptive_agentops/__init__.py \
-            adaptive_agentops/identity.py adaptive_agentops/policy.py adaptive_agentops/tool_requests.py \
-            adaptive_agentops/stage4_boundary/__init__.py adaptive_agentops/stage4_boundary/delegation.py \
-            scripts/stage4_peer_probe.py scripts/stage4_native_acceptance.py \
-            scripts/stage42_native_acceptance.py scripts/stage42_native_probe.py; do
-            test -f "$file"
-            test ! -L "$file"
-            sudo -n install -D -m 0644 -- "$file" "$staging/$file"
-          done
-          sudo -n install -d -m 0700 -- "$staging/wheels"
-          for wheel in "$RUNNER_TEMP/stage42-wheels/"*.whl; do
-            test -f "$wheel"
-            test ! -L "$wheel"
-            sudo -n sh -ec 'umask 077; cat > "$1"' sh "$staging/wheels/${wheel##*/}" < "$wheel"
-          done
-          sudo -n chmod 0755 "$staging"
-          sudo -n env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
-            timeout --signal=INT --kill-after=5s 180s unshare --net -- sh -ec '
-              ip link set dev lo up
-              cd "$1"
-              exec /usr/bin/python3.12 -I -B -S scripts/stage42_native_acceptance.py run
-            ' sh "$staging"
+          if ! setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py"); then
+            echo "::error title=Stage 4.2 setup failure::Reviewed setup source unavailable"
+            exit 1
+          fi
+          set +e
+          /usr/bin/python3.12 -I -B -S -c "$setup" pack "$GITHUB_SHA" "$RUNNER_TEMP/stage42-wheels" |
+            sudo -n /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+              /usr/bin/timeout --signal=INT --kill-after=5s 180s \
+              /usr/bin/unshare --net -- /usr/bin/sh -ec '
+                if ! /usr/sbin/ip link set dev lo up; then
+                  echo "::error title=Stage 4.2 setup failure::Could not initialize isolated loopback" >&2
+                  exit 1
+                fi
+                exec /usr/bin/python3.12 -I -B -S -c "$1" run
+              ' sh "$setup"
+          statuses=("${PIPESTATUS[@]}")
+          if [[ ${statuses[0]} -ne 0 || ${statuses[1]} -ne 0 && ${statuses[1]} -ne 79 ]]; then
+            echo "::error title=Stage 4.2 infrastructure failure::Runner setup or execution infrastructure failed (pack=${statuses[0]}, run=${statuses[1]})"
+            exit 1
+          fi
+          exit "${statuses[1]}"

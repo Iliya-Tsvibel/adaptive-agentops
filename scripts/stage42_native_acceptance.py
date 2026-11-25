@@ -1,6 +1,6 @@
 """Root orchestrator for the separately authorized Stage 4.2 VM workflow."""
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from hashlib import file_digest
 import json
 import os
@@ -11,7 +11,8 @@ import stat
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile
+from traceback import print_exc
+from zipfile import BadZipFile, ZipFile
 
 
 PACKAGES = frozenset({
@@ -19,7 +20,9 @@ PACKAGES = frozenset({
 })
 PIN = re.compile(r"([a-z-]+)==[0-9]+(?:\.[0-9]+)+ --hash=sha256:([0-9a-f]{64})")
 FRAME = b'AAO\x02\x01{"tool":"mock.get_health","resource":"demo-api","arguments":{}}'
-STAGE = Path(__file__).resolve().parents[1]
+STAGE = Path(__file__).absolute().parents[1]
+SETUP_FAILED = 78
+PROBE_FAILED = 79
 
 
 def require(condition, message):
@@ -199,37 +202,82 @@ def check_evidence_failure(legacy, path):
     print("PASS 4.2 journal failure and recorded decision without a delivered verdict", flush=True)
 
 
-def run():
-    require(os.geteuid() == 0 and Path.cwd() == STAGE and STAGE.parent == Path("/opt")
-            and STAGE.name.startswith("aao-stage42-code.") and sys.flags.isolated and sys.flags.no_site,
-            "Disposable root-owned isolated staging is required")
-    info = STAGE.stat()
-    parent = STAGE.parent.stat()
-    require(info.st_uid == parent.st_uid == 0 and stat.S_IMODE(info.st_mode) == 0o755
-            and not parent.st_mode & 0o022, "Unsafe code staging metadata")
-    sys.path.insert(0, str(STAGE))
-    from scripts import stage4_native_acceptance as legacy
+def validate_staging(stage):
+    for path, exact_mode in ((stage.parent.parent, None), (stage.parent, None),
+                             (stage, 0o755), (stage / "wheels", 0o700)):
+        try:
+            info = path.lstat()
+        except OSError as error:
+            raise RuntimeError(f"{path}: metadata unavailable (errno={error.errno})") from None
+        mode = stat.S_IMODE(info.st_mode)
+        expected = ("other search access and no group or other write access" if exact_mode is None
+                    else f"mode {exact_mode:04o}")
+        require(stat.S_ISDIR(info.st_mode) and (info.st_uid, info.st_gid) == (0, 0)
+                and (mode & 0o023 == 0o001 if exact_mode is None else mode == exact_mode),
+                f"{path}: expected root:root directory with {expected} "
+                f"(uid={info.st_uid} gid={info.st_gid} mode={mode:04o} type={stat.filemode(info.st_mode)[0]})")
 
-    legacy.main()
+
+def prepare():
+    require(os.geteuid() == 0 and STAGE.parent == Path("/run")
+            and STAGE.name.startswith("aao-stage42-code.") and sys.flags.isolated
+            and sys.flags.no_site and sys.flags.dont_write_bytecode,
+            "Expected isolated root driver in /run staging")
+    validate_staging(STAGE)
+    require("system.posix_acl_default" not in os.listxattr(STAGE, follow_symlinks=False),
+            "Staging directory has an unexpected default ACL")
+    require(Path.cwd() == STAGE, "Expected working directory to match the validated staging directory")
     os.umask(0o022)
     extract_wheels(STAGE / "wheels", STAGE / "deps", dependency_pins(STAGE / ".github/ci-requirements.txt"))
+
+
+@contextmanager
+def proposal_socket(legacy):
     with TemporaryDirectory(prefix="aao-stage42-", dir="/run") as directory:
         root = Path(directory)
         root.chmod(0o755)
         socket_dir = root / "agent"
         socket_dir.mkdir(mode=0o750)
         os.chown(socket_dir, legacy.CONTROL, legacy.PROPOSERS)
-        path = socket_dir / "proposal.sock"
-        check_live_session(legacy, path)
-        check_denials(legacy, path)
-        check_wrong_server(legacy, path)
-        check_evidence_failure(legacy, path)
+        yield socket_dir / "proposal.sock"
+
+
+def run():
+    with ExitStack() as resources:
+        try:
+            prepare()
+            sys.path.insert(0, str(STAGE))
+            from scripts import stage4_native_acceptance as legacy
+
+            legacy_paths = resources.enter_context(legacy.prepare_native())
+            path = resources.enter_context(proposal_socket(legacy))
+        except (RuntimeError, OSError, BadZipFile, UnicodeError, ImportError) as error:
+            if isinstance(error, OSError):
+                detail = f"setup filesystem or process operation failed (errno={error.errno})"
+            elif isinstance(error, (BadZipFile, UnicodeError, ImportError)):
+                detail = f"setup input rejected ({type(error).__name__})"
+            else:
+                detail = str(error)
+            print(f"::error title=Stage 4.2 setup failure::{detail}", file=sys.stderr)
+            return SETUP_FAILED
+
+        print("START stage42 native security probes", flush=True)
+        try:
+            legacy.run_probes(*legacy_paths)
+            check_live_session(legacy, path)
+            check_denials(legacy, path)
+            check_wrong_server(legacy, path)
+            check_evidence_failure(legacy, path)
+        except Exception:
+            print_exc()
+            return PROBE_FAILED
+    return 0
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "pins":
         print(*dependency_pins(Path(sys.argv[2])).values(), sep="\n")
     elif sys.argv[1:] == ["run"]:
-        run()
+        sys.exit(run())
     else:
         sys.exit("Expected pins MANIFEST or run")

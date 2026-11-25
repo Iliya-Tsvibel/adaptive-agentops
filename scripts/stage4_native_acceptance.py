@@ -227,7 +227,8 @@ def check_paths(path):
     print("PASS ownership, mode, POSIX ACL and existing-entry denial", flush=True)
 
 
-def main():
+@contextmanager
+def prepare_native():
     require(sys.platform == "linux" and not any(word in os.uname().release.lower() for word in ("wsl", "microsoft")),
             "Native Linux is required")
     require(os.geteuid() == 0 and os.readlink("/proc/self/ns/net") != os.readlink("/proc/1/ns/net")
@@ -247,14 +248,18 @@ def main():
             os.chown(path.parent, uid, gid)
             path.parent.chmod(0o750)
 
-        check_paths(agent_path)
-        with listener(CONTROL, PROPOSERS, "agent-control", agent_path):
-            run_probe(AGENT, probe("connect", "agent-control", agent_path, PROPOSERS))
-        print("PASS agent to control mutual authentication and cleanup", flush=True)
+        yield agent_path, target_path
 
-        with listener(TARGET, DISPATCHERS, "control-target", target_path):
-            expect_unix_access_denied(target_path)
-            agent_check("""
+
+def run_probes(agent_path, target_path):
+    check_paths(agent_path)
+    with listener(CONTROL, PROPOSERS, "agent-control", agent_path):
+        run_probe(AGENT, probe("connect", "agent-control", agent_path, PROPOSERS))
+    print("PASS agent to control mutual authentication and cleanup", flush=True)
+
+    with listener(TARGET, DISPATCHERS, "control-target", target_path):
+        expect_unix_access_denied(target_path)
+        agent_check("""
 import errno
 import socket
 import sys
@@ -266,18 +271,23 @@ for port in (8000, 8001):
         if actual != errno.ECONNREFUSED:
             sys.exit(f"Expected no legacy HTTP listener on port {port}, got errno {actual}")
 """)
-            run_probe(CONTROL, probe("connect", "control-target", target_path, DISPATCHERS))
-        print("PASS control to target, agent denied directly, legacy loopback ports closed", flush=True)
+        run_probe(CONTROL, probe("connect", "control-target", target_path, DISPATCHERS))
+    print("PASS control to target, agent denied directly, legacy loopback ports closed", flush=True)
 
-        with listener(TARGET, DISPATCHERS, "control-target", target_path, "IdentityError"):
-            expect_no_reply(target_path, groups=(DISPATCHERS,))
-        with listener(CONTROL, PROPOSERS, "agent-control", agent_path, "ProtocolError"):
-            expect_no_reply(agent_path)
-        print("PASS wrong UID with socket access, invalid frame and denial cleanup", flush=True)
+    with listener(TARGET, DISPATCHERS, "control-target", target_path, "IdentityError"):
+        expect_no_reply(target_path, groups=(DISPATCHERS,))
+    with listener(CONTROL, PROPOSERS, "agent-control", agent_path, "ProtocolError"):
+        expect_no_reply(agent_path)
+    print("PASS wrong UID with socket access, invalid frame and denial cleanup", flush=True)
 
-        expect_client_peer_denial(AGENT, CONTROL, TARGET, PROPOSERS, "agent-control", agent_path)
-        expect_client_peer_denial(CONTROL, TARGET, AGENT, DISPATCHERS, "control-target", target_path)
-        print("PASS both clients rejected wrong-UID listeners before sending data", flush=True)
+    expect_client_peer_denial(AGENT, CONTROL, TARGET, PROPOSERS, "agent-control", agent_path)
+    expect_client_peer_denial(CONTROL, TARGET, AGENT, DISPATCHERS, "control-target", target_path)
+    print("PASS both clients rejected wrong-UID listeners before sending data", flush=True)
+
+
+def main():
+    with prepare_native() as paths:
+        run_probes(*paths)
 
 
 if __name__ == "__main__":

@@ -43,7 +43,12 @@ STAGE45_SOURCES = STAGE44_SOURCES + (
     "scripts/stage45_native_acceptance.py",
     "scripts/stage45_native_probe.py",
 )
-_SCOPE_SOURCES = {42: SOURCES, 43: STAGE43_SOURCES, 44: STAGE44_SOURCES, 45: STAGE45_SOURCES}
+STAGE46_SOURCES = STAGE45_SOURCES + (
+    "adaptive_agentops/stage4_boundary/target_state.py",
+    "scripts/stage46_native_acceptance.py",
+    "scripts/stage46_native_probe.py",
+)
+_SCOPE_SOURCES = {42: SOURCES, 43: STAGE43_SOURCES, 44: STAGE44_SOURCES, 45: STAGE45_SOURCES, 46: STAGE46_SOURCES}
 DRIVER = "scripts/stage42_native_acceptance.py"
 CODE_PARENT = Path("/var/lib")
 SOCKET_PARENT = Path("/run")
@@ -56,7 +61,7 @@ SETUP_FAILED = 78
 PROBE_FAILED = 79
 SOURCE_LIMIT = 128 * 1024
 WHEEL_LIMIT = 10 * 1024**2
-BUNDLE_LIMIT = len(STAGE45_SOURCES) * SOURCE_LIMIT + WHEEL_COUNT * WHEEL_LIMIT + 16384
+BUNDLE_LIMIT = len(STAGE46_SOURCES) * SOURCE_LIMIT + WHEEL_COUNT * WHEEL_LIMIT + 16384
 
 
 def require(condition, message):

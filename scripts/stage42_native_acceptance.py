@@ -286,6 +286,10 @@ def run(*, selected=42):
                 from scripts import stage45_native_acceptance
 
                 dispatch_paths = resources.enter_context(stage45_native_acceptance.prepare(legacy))
+            if selected >= 46:
+                from scripts import stage46_native_acceptance
+
+                effect_paths = resources.enter_context(stage46_native_acceptance.prepare(legacy))
         except (RuntimeError, OSError, BadZipFile, UnicodeError, ImportError, subprocess.TimeoutExpired) as error:
             if isinstance(error, OSError):
                 detail = f"setup filesystem or process operation failed (errno={error.errno})"
@@ -311,6 +315,8 @@ def run(*, selected=42):
                 stage44_native_acceptance.run(legacy, *protected_paths)
             if selected >= 45:
                 stage45_native_acceptance.run(legacy, *dispatch_paths)
+            if selected >= 46:
+                stage46_native_acceptance.run(legacy, *effect_paths)
         except Exception:
             print_exc()
             return PROBE_FAILED
@@ -321,7 +327,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "pins":
         print(*dependency_pins(Path(sys.argv[2])).values(), sep="\n")
     else:
-        modes = {"run": 42, "run-stage43": 43, "run-stage44": 44, "run-stage45": 45}
+        modes = {"run": 42, "run-stage43": 43, "run-stage44": 44, "run-stage45": 45, "run-stage46": 46}
         if len(sys.argv) == 2 and sys.argv[1] in modes:
             sys.exit(run(selected=modes[sys.argv[1]]))
         sys.exit("Expected pins MANIFEST or a supported native run mode")

@@ -18,6 +18,11 @@ on:
         type: boolean
         required: false
         default: false
+      include_stage46:
+        description: Include Stage 4.6 durable SQLite effects (requires Stage 4.3 through 4.5)
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -77,12 +82,14 @@ jobs:
           INCLUDE_STAGE43: ${{ inputs.include_stage43 }}
           INCLUDE_STAGE44: ${{ inputs.include_stage44 }}
           INCLUDE_STAGE45: ${{ inputs.include_stage45 }}
+          INCLUDE_STAGE46: ${{ inputs.include_stage46 }}
         run: |
-          case "$INCLUDE_STAGE43:$INCLUDE_STAGE44:$INCLUDE_STAGE45" in
-            true:true:true) pack=pack-stage45; run=run-stage45 ;;
-            true:true:false) pack=pack-stage44; run=run-stage44 ;;
-            true:false:false) pack=pack-stage43; run=run-stage43 ;;
-            false:false:false) pack=pack; run=run ;;
+          case "$INCLUDE_STAGE43:$INCLUDE_STAGE44:$INCLUDE_STAGE45:$INCLUDE_STAGE46" in
+            true:true:true:true) pack=pack-stage46; run=run-stage46 ;;
+            true:true:true:false) pack=pack-stage45; run=run-stage45 ;;
+            true:true:false:false) pack=pack-stage44; run=run-stage44 ;;
+            true:false:false:false) pack=pack-stage43; run=run-stage43 ;;
+            false:false:false:false) pack=pack; run=run ;;
             *) echo "Invalid native acceptance scope" >&2; exit 1 ;;
           esac
           if ! setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py"); then

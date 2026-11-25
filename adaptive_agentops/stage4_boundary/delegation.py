@@ -145,7 +145,7 @@ class _Outcome:
 
 
 class _Session:
-    def __init__(self, agent_uid: int, grant_seconds: int | None):
+    def __init__(self, agent_uid: int, grant_seconds: int | None, *, store=None):
         if grant_seconds is not None and (
             type(grant_seconds) is not int or not 1 <= grant_seconds <= _MAX_GRANT_SECONDS
         ):
@@ -157,6 +157,8 @@ class _Session:
         self.journal: list[AdmissionEvent] = []
         self.grant = None
         self.grant_revoked = False
+        self._grant_expired = False
+        self._store = store
         if grant_seconds is not None:
             self.grant = self.new_grant(agent_uid, grant_seconds, self.clock.start)
 
@@ -168,12 +170,21 @@ class _Session:
             _TOOL, _RESOURCE, self.context.environment, wall + lifetime, elapsed + lifetime,
         )
 
+    def observe_expiry(self, sample) -> None:
+        if (
+            self._store is not None and self.grant is not None and not self.grant_revoked
+            and not self._grant_expired and not self.grant.is_live(sample)
+        ):
+            self._store.expire(self.grant)
+            self._grant_expired = True
+
     def evaluate(self, peer_uid: int, proposal: MockGetHealthProposal) -> _Outcome:
         try:
             sample = self.clock.sample()
         except ClockError:
             return _Outcome(AdmissionReason.CLOCK_ERROR)
 
+        self.observe_expiry(sample)
         grant = self.grant
         if grant is None:
             return _Outcome(AdmissionReason.MISSING_GRANT, False)
@@ -196,6 +207,7 @@ class _Session:
             sample = self.clock.sample()
         except ClockError:
             return _Outcome(AdmissionReason.CLOCK_ERROR, None, decision)
+        self.observe_expiry(sample)
         if not grant.is_live(sample):
             return _Outcome(AdmissionReason.GRANT_EXPIRED, False, decision)
         return _Outcome(AdmissionReason.ADMITTED, True, decision)
@@ -203,7 +215,7 @@ class _Session:
     def record(self, peer_uid: int | None, outcome: _Outcome) -> None:
         if len(self.journal) >= _MAX_CONNECTIONS:
             raise BoundaryError("admission journal exhausted")
-        self.journal.append(AdmissionEvent(
+        event = AdmissionEvent(
             event_id=uuid4(),
             session_id=self.session_id,
             peer_uid=peer_uid,
@@ -214,7 +226,10 @@ class _Session:
             reason=outcome.reason,
             grant_matched=outcome.grant_matched,
             policy_decision=outcome.policy_decision,
-        ))
+        )
+        if self._store is not None:
+            self._store.record_admission(event, self.grant)
+        self.journal.append(event)
 
 
 def _read_frame(connection, limit: int, deadline: float) -> bytes:
@@ -311,6 +326,7 @@ def _handle_connection(connection, session: _Session, client_uid: int, deadline:
             sample = session.clock.sample()
         except ClockError:
             return False
+        session.observe_expiry(sample)
         if session.grant_revoked or not session.grant.is_live(sample):
             return True
 

@@ -366,3 +366,15 @@ def test_loader_preflight_runs_with_isolated_unprivileged_control_identity(monke
     monkeypatch.setattr(driver.subprocess, "run", run)
     with pytest.raises(RuntimeError, match="shared object executable segment could not be mapped"):
         driver.verify_dependency_runtime(legacy)
+
+
+def test_stage44_scope_requires_the_complete_cumulative_source_allowlist(tmp_path):
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    with pytest.raises(RuntimeError, match="missing reviewed source"):
+        setup.stage_bundle(make_bundle(sources=setup.STAGE43_SOURCES), stage, setup.STAGE44_SOURCES)
+    assert not list(stage.iterdir())
+    setup.stage_bundle(make_bundle(sources=setup.STAGE44_SOURCES), stage, setup.STAGE44_SOURCES)
+    assert {
+        path.relative_to(stage).as_posix() for path in stage.rglob("*") if path.is_file()
+    } == set(setup.STAGE44_SOURCES) | set(WHEELS)

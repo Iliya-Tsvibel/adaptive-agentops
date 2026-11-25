@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import socket
 import sys
+from urllib.parse import unquote, urlsplit
 
 
 class InjectedJournalError(OSError):
@@ -67,7 +68,7 @@ def server(delegation, endpoint, uids, scenario, verify_effects):
     print(json.dumps(evidence))
 
 
-def effect_guard(*additional_modules):
+def effect_guard(*additional_modules, sqlite_database=None):
     allowed_modules = {
         "adaptive_agentops.identity", "adaptive_agentops.policy", "adaptive_agentops.tool_requests",
         "adaptive_agentops.stage4_boundary", "adaptive_agentops.stage4_boundary.delegation",
@@ -83,6 +84,16 @@ def effect_guard(*additional_modules):
         return name.startswith("adaptive_agentops.") and name not in allowed_modules
 
     def forbid_effects(event, args):
+        if (event == "sqlite3.connect" and sqlite_database is not None
+                and len(args) == 1 and type(args[0]) is str):
+            try:
+                database = urlsplit(args[0])
+                if (database.scheme == "file" and not database.netloc and not database.fragment
+                        and database.query == "mode=rw"
+                        and Path(unquote(database.path)).resolve() == sqlite_database):
+                    return
+            except (ValueError, OSError, RuntimeError):
+                pass
         if event in blocked or (event == "import" and forbidden_module(args[0])):
             violations.append(event)
             raise RuntimeError("Admission attempted an effect")

@@ -184,17 +184,21 @@ def request_grant(
 
 
 class _Controller:
-    def __init__(self, agent_uid: int, operators: tuple[OperatorIdentity, ...]):
+    def __init__(self, agent_uid: int, operators: tuple[OperatorIdentity, ...], *, store=None):
         self.agent_uid = agent_uid
         self.operators = MappingProxyType({operator.uid: operator for operator in operators})
-        self.admission = delegation._Session(agent_uid, None)
+        self.admission = delegation._Session(agent_uid, None, store=store)
+        self._store = store
         self.grantor_uid = None
         self.journal: list[OperatorEvent] = []
 
-    def record(self, uid, method, result, grant_id=None):
+    def record(self, uid, method, result, grant_id=None, *, grant=None):
         if len(self.journal) >= delegation._MAX_CONNECTIONS:
             raise BoundaryError("operator journal exhausted")
-        self.journal.append(OperatorEvent(uuid4(), self.admission.session_id, uid, grant_id, method, result))
+        event = OperatorEvent(uuid4(), self.admission.session_id, uid, grant_id, method, result)
+        if self._store is not None:
+            self._store.record_operator(event, grant=grant)
+        self.journal.append(event)
 
     def handle_operator(self, connection, deadline: float) -> bool:
         try:
@@ -239,6 +243,7 @@ class _Controller:
         session = self.admission
         method = request.method
         sample = session.clock.sample()
+        session.observe_expiry(sample)
         grant = session.grant
         if method is GrantMethod.ISSUE:
             if grant is not None:
@@ -264,25 +269,38 @@ class _Controller:
             self.record(uid, method, OperatorResult.GRANT_UNAVAILABLE)
             return _DENIED
 
-        self.record(uid, method, OperatorResult.ACCEPTED, grant.grant_id)
+        if self._store is None:
+            self.record(uid, method, OperatorResult.ACCEPTED, grant.grant_id)
         sample = session.clock.sample()
+        session.observe_expiry(sample)
         try:
             _remaining(deadline)
         except TimeoutError:
             return None
-        if method in (GrantMethod.ISSUE, GrantMethod.REVOKE) and not grant.is_live(sample):
+        transition = method in (GrantMethod.ISSUE, GrantMethod.REVOKE)
+        if transition and not grant.is_live(sample):
+            if self._store is not None:
+                self.record(uid, method, OperatorResult.GRANT_UNAVAILABLE)
             return _DENIED
-        state = GrantState.ACTIVE if grant.is_live(sample) else GrantState.EXPIRED
-        if method is GrantMethod.REVOKE or session.grant_revoked:
-            state = GrantState.REVOKED
-        reply = _grant_frame(GrantView(
-            state, grant.grant_id, grant.session_id, grant.run_id, grant.wall_expiry, grant.agent_uid,
-        ))
+        if self._store is not None:
+            self.record(uid, method, OperatorResult.ACCEPTED, grant.grant_id, grant=grant)
         if method is GrantMethod.ISSUE:
             self.grantor_uid, session.grant = uid, grant
         elif method is GrantMethod.REVOKE:
             session.grant_revoked = True
-        return reply
+        if self._store is not None:
+            # Required SQLite I/O may have consumed the remainder of the grant.
+            sample = session.clock.sample()
+            session.observe_expiry(sample)
+            if transition and not grant.is_live(sample):
+                return None
+
+        state = GrantState.ACTIVE if grant.is_live(sample) else GrantState.EXPIRED
+        if session.grant_revoked:
+            state = GrantState.REVOKED
+        return _grant_frame(GrantView(
+            state, grant.grant_id, grant.session_id, grant.run_id, grant.wall_expiry, grant.agent_uid,
+        ))
 
 
 def _validate_launch(agent: Endpoint, operator: Endpoint, uids: TrustedUIDs, operators) -> None:
@@ -314,7 +332,25 @@ def serve_managed_admission(
     """Run both protected links in one serial controller session."""
     _validate_launch(agent, operator, uids, operators)
     _require_local_uid(uids.control)
-    controller = _Controller(uids.agent, operators)
+    return _serve_controller(agent, operator, uids, _Controller(uids.agent, operators))
+
+
+def serve_protected_admission(
+    agent: Endpoint, operator: Endpoint, uids: TrustedUIDs, operators: tuple[OperatorIdentity, ...],
+    *, state_dir,
+) -> SessionEvidence:
+    """Serve the serial Controller only after durable startup has committed."""
+    from .controller_state import _open_controller_state
+
+    _validate_launch(agent, operator, uids, operators)
+    _require_local_uid(uids.control)
+    with _open_controller_state(state_dir, uids.control) as store:
+        controller = _Controller(uids.agent, operators, store=store)
+        store.start(controller.admission, uids.control, uids.agent, operators, delegation._TOOL, delegation._RESOURCE)
+        return _serve_controller(agent, operator, uids, controller)
+
+
+def _serve_controller(agent, operator, uids, controller):
     with _listen(agent, uids.control) as agent_socket, _listen(operator, uids.control) as operator_socket:
         with DefaultSelector() as selector:
             selector.register(operator_socket, EVENT_READ, True)

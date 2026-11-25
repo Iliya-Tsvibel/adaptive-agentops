@@ -264,7 +264,7 @@ def proposal_socket(legacy):
         yield socket_dir / "proposal.sock"
 
 
-def run(*, stage43=False):
+def run(*, stage43=False, stage44=False):
     with ExitStack() as resources:
         try:
             prepare()
@@ -274,10 +274,14 @@ def run(*, stage43=False):
             legacy_paths = resources.enter_context(legacy.prepare_native())
             verify_dependency_runtime(legacy)
             path = resources.enter_context(proposal_socket(legacy))
-            if stage43:
+            if stage43 or stage44:
                 from scripts import stage43_native_acceptance
 
                 managed_paths = resources.enter_context(stage43_native_acceptance.prepare(legacy))
+            if stage44:
+                from scripts import stage44_native_acceptance
+
+                protected_paths = resources.enter_context(stage44_native_acceptance.prepare(legacy))
         except (RuntimeError, OSError, BadZipFile, UnicodeError, ImportError, subprocess.TimeoutExpired) as error:
             if isinstance(error, OSError):
                 detail = f"setup filesystem or process operation failed (errno={error.errno})"
@@ -297,8 +301,10 @@ def run(*, stage43=False):
             check_denials(legacy, path)
             check_wrong_server(legacy, path)
             check_evidence_failure(legacy, path)
-            if stage43:
+            if stage43 or stage44:
                 stage43_native_acceptance.run(legacy, *managed_paths)
+            if stage44:
+                stage44_native_acceptance.run(legacy, *protected_paths)
         except Exception:
             print_exc()
             return PROBE_FAILED
@@ -308,7 +314,7 @@ def run(*, stage43=False):
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "pins":
         print(*dependency_pins(Path(sys.argv[2])).values(), sep="\n")
-    elif sys.argv[1:] in (["run"], ["run-stage43"]):
-        sys.exit(run(stage43=sys.argv[1] == "run-stage43"))
+    elif sys.argv[1:] in (["run"], ["run-stage43"], ["run-stage44"]):
+        sys.exit(run(stage43=sys.argv[1] == "run-stage43", stage44=sys.argv[1] == "run-stage44"))
     else:
-        sys.exit("Expected pins MANIFEST, run, or run-stage43")
+        sys.exit("Expected pins MANIFEST, run, run-stage43 or run-stage44")

@@ -8,6 +8,11 @@ on:
         type: boolean
         required: false
         default: false
+      include_stage44:
+        description: Include Stage 4.4 protected state (requires include_stage43)
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -65,10 +70,12 @@ jobs:
       - name: Stage and run the selected IPC acceptance slices offline under distinct UIDs
         env:
           INCLUDE_STAGE43: ${{ inputs.include_stage43 }}
+          INCLUDE_STAGE44: ${{ inputs.include_stage44 }}
         run: |
-          case "$INCLUDE_STAGE43" in
-            true) pack=pack-stage43; run=run-stage43 ;;
-            false) pack=pack; run=run ;;
+          case "$INCLUDE_STAGE43:$INCLUDE_STAGE44" in
+            true:true) pack=pack-stage44; run=run-stage44 ;;
+            true:false) pack=pack-stage43; run=run-stage43 ;;
+            false:false) pack=pack; run=run ;;
             *) echo "Invalid native acceptance scope" >&2; exit 1 ;;
           esac
           if ! setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py"); then

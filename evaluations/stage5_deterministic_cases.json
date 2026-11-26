@@ -1,0 +1,805 @@
+{
+  "version": 1,
+  "provenance": "Hand-authored synthetic stimuli and oracle based on accepted Stage 5.1/5.2 contracts, separated from v5 regression data.",
+  "repetitions": 2,
+  "common_assertions": [
+    "determinism",
+    "immutability",
+    "redaction",
+    "output_allowlist",
+    "output_bound",
+    "no_io",
+    "no_authority"
+  ],
+  "fixture_assertions": [
+    "classification",
+    "full_normalized_result",
+    "source_provenance",
+    "exact_diagnostic"
+  ],
+  "unchecked_assertions": [
+    "exact_diagnostic",
+    "no_custom_hooks"
+  ],
+  "cases": [
+    {
+      "id": "controller-effect-target-unavailable",
+      "family": "corroboration",
+      "nearest": "both-committed",
+      "novelty": "A durable Controller result survives Target unavailability, attributed only to Controller.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": "SIMULATED_EFFECT_COMMITTED",
+                "event": {
+                  "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "status": "SIMULATED_EFFECT_COMMITTED"
+                },
+                "effect_number": 1,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005",
+                  "approval_id": "00000000-0000-4000-8000-000000000003",
+                  "consumed": true,
+                  "decision": "APPROVED"
+                }
+              }
+            ]
+          },
+          "target": {
+            "coverage": "UNAVAILABLE",
+            "capture": "fixture-2",
+            "order": 2,
+            "rows": []
+          }
+        }
+      },
+      "expected_result": {
+        "status": "SIMULATED_EFFECT_RECORDED",
+        "reason": "BOUND_EFFECT",
+        "controller_coverage": "COMPLETE",
+        "target_coverage": "UNAVAILABLE",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2",
+        "controller_outcome": "SIMULATED_EFFECT_COMMITTED",
+        "target_fact": "NOT_OBSERVED",
+        "effect_number": 1,
+        "effect_sources": [
+          "CONTROLLER"
+        ],
+        "capture_order": "CONTROLLER_FIRST"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"SIMULATED_EFFECT_RECORDED\",\"controller_coverage\":\"COMPLETE\",\"target_coverage\":\"UNAVAILABLE\",\"effect_sources\":[\"CONTROLLER\"]}"
+    },
+    {
+      "id": "different-positive-effect-numbers",
+      "family": "corroboration",
+      "nearest": "both-committed",
+      "novelty": "Conflicting positive effect numbers dominate matching IDs and digest.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": "SIMULATED_EFFECT_COMMITTED",
+                "event": {
+                  "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "status": "SIMULATED_EFFECT_COMMITTED"
+                },
+                "effect_number": 1,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005",
+                  "approval_id": "00000000-0000-4000-8000-000000000003",
+                  "consumed": true,
+                  "decision": "APPROVED"
+                }
+              }
+            ]
+          },
+          "target": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-2",
+            "order": 2,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "effect_number": 2
+              }
+            ]
+          }
+        }
+      },
+      "expected_result": {
+        "status": "INCONSISTENT",
+        "reason": "CROSS_SOURCE_CONFLICT",
+        "controller_coverage": "COMPLETE",
+        "target_coverage": "COMPLETE",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2",
+        "controller_outcome": "SIMULATED_EFFECT_COMMITTED",
+        "target_fact": "CLAIM_WITH_EFFECT",
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": "CONTROLLER_FIRST"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"INCONSISTENT\",\"controller_coverage\":\"COMPLETE\",\"target_coverage\":\"COMPLETE\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "equal-order-null-receipt",
+      "family": "corroboration",
+      "nearest": "later-null",
+      "novelty": "Equality at the temporal conflict boundary must fail closed.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": "SIMULATED_EFFECT_COMMITTED",
+                "event": {
+                  "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "status": "SIMULATED_EFFECT_COMMITTED"
+                },
+                "effect_number": 1,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005",
+                  "approval_id": "00000000-0000-4000-8000-000000000003",
+                  "consumed": true,
+                  "decision": "APPROVED"
+                }
+              }
+            ]
+          },
+          "target": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-2",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "effect_number": null
+              }
+            ]
+          }
+        }
+      },
+      "expected_result": {
+        "status": "INCONSISTENT",
+        "reason": "LATER_TARGET_EVIDENCE_CONFLICT",
+        "controller_coverage": "COMPLETE",
+        "target_coverage": "COMPLETE",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2",
+        "controller_outcome": "SIMULATED_EFFECT_COMMITTED",
+        "target_fact": "CLAIM_WITHOUT_EFFECT",
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": "SAME_ORDER"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"INCONSISTENT\",\"controller_coverage\":\"COMPLETE\",\"target_coverage\":\"COMPLETE\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "partial-no-send-event-without-approval",
+      "family": "corroboration",
+      "nearest": "no-send",
+      "novelty": "Matching no-send event without an approval row cannot corroborate no-send under partial coverage.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "PARTIAL",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": "RESERVED_NO_SEND",
+                "event": {
+                  "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "status": "RESERVED_NO_SEND"
+                },
+                "effect_number": null,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": null
+              }
+            ]
+          },
+          "target": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": []
+          }
+        }
+      },
+      "expected_result": {
+        "status": "UNRESOLVED",
+        "reason": "OBSERVED_WITHOUT_BOUND_OUTCOME",
+        "controller_coverage": "PARTIAL",
+        "target_coverage": "COMPLETE",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-1",
+        "controller_outcome": "RESERVED_NO_SEND",
+        "target_fact": "NO_ROW",
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": "SAME_ORDER"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRESOLVED\",\"controller_coverage\":\"PARTIAL\",\"target_coverage\":\"COMPLETE\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "empty-partial-target",
+      "family": "uncertainty",
+      "nearest": "both-missing",
+      "novelty": "Empty partial Target observation does not establish complete absence.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": []
+          },
+          "target": {
+            "coverage": "PARTIAL",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": []
+          }
+        }
+      },
+      "expected_result": {
+        "status": "UNRESOLVED",
+        "reason": "PARTIAL_COVERAGE",
+        "controller_coverage": "COMPLETE",
+        "target_coverage": "PARTIAL",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-1",
+        "controller_outcome": null,
+        "target_fact": "NOT_OBSERVED",
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": "SAME_ORDER"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRESOLVED\",\"controller_coverage\":\"COMPLETE\",\"target_coverage\":\"PARTIAL\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "target-positive-controller-unavailable",
+      "family": "uncertainty",
+      "nearest": "partial",
+      "novelty": "Unavailable Controller leaves an observed positive Target claim unanchored without erasing its source fact.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "UNAVAILABLE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": []
+          },
+          "target": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-2",
+            "order": 2,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "effect_number": 1
+              }
+            ]
+          }
+        }
+      },
+      "expected_result": {
+        "status": "UNRESOLVED",
+        "reason": "OBSERVED_WITHOUT_BOUND_OUTCOME",
+        "controller_coverage": "UNAVAILABLE",
+        "target_coverage": "COMPLETE",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2",
+        "controller_outcome": null,
+        "target_fact": "CLAIM_WITH_EFFECT",
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": "CONTROLLER_FIRST"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRESOLVED\",\"controller_coverage\":\"UNAVAILABLE\",\"target_coverage\":\"COMPLETE\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "earlier-complete-anchor-no-digest",
+      "family": "uncertainty",
+      "nearest": "complete-missing-pre-send-digest",
+      "novelty": "Earlier complete observation has an anchor but need not yet contain the later Target digest.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": null,
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": null,
+                "event": null,
+                "effect_number": null,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005",
+                  "approval_id": "00000000-0000-4000-8000-000000000003",
+                  "consumed": true,
+                  "decision": "APPROVED"
+                }
+              }
+            ]
+          },
+          "target": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-2",
+            "order": 2,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "effect_number": 1
+              }
+            ]
+          }
+        }
+      },
+      "expected_result": {
+        "status": "UNRESOLVED",
+        "reason": "OBSERVED_WITHOUT_BOUND_OUTCOME",
+        "controller_coverage": "COMPLETE",
+        "target_coverage": "COMPLETE",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2",
+        "controller_outcome": null,
+        "target_fact": "CLAIM_WITH_EFFECT",
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": "CONTROLLER_FIRST"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRESOLVED\",\"controller_coverage\":\"COMPLETE\",\"target_coverage\":\"COMPLETE\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "earlier-partial-anchor-without-approval",
+      "family": "uncertainty",
+      "nearest": "partial",
+      "novelty": "Earlier partial observation contains an action but lacks both approval corroboration and digest.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "PARTIAL",
+            "capture": "fixture-301",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": null,
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": "UNKNOWN",
+                "event": {
+                  "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "status": "UNKNOWN"
+                },
+                "effect_number": null,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": null
+              }
+            ]
+          },
+          "target": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-2",
+            "order": 2,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "effect_number": 1
+              }
+            ]
+          }
+        }
+      },
+      "expected_result": {
+        "status": "UNRESOLVED",
+        "reason": "OBSERVED_WITHOUT_BOUND_OUTCOME",
+        "controller_coverage": "PARTIAL",
+        "target_coverage": "COMPLETE",
+        "controller_capture": "fixture-301",
+        "target_capture": "fixture-2",
+        "controller_outcome": "UNKNOWN",
+        "target_fact": "CLAIM_WITH_EFFECT",
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": "CONTROLLER_FIRST"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRESOLVED\",\"controller_coverage\":\"PARTIAL\",\"target_coverage\":\"COMPLETE\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "unsupported-version",
+      "family": "invalid",
+      "nearest": "test_invalid_and_bounded_bytes",
+      "novelty": "A structurally complete fixture with an unsupported integer version.",
+      "stimulus": {
+        "kind": "bytes_hex",
+        "data": "7b2276657273696f6e223a20322c202264697370617463685f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303031222c2022636f6e74726f6c6c6572223a207b22636f766572616765223a2022434f4d504c455445222c202263617074757265223a2022666978747572652d31222c20226f72646572223a20312c2022726f7773223a205b5d7d2c2022746172676574223a207b22636f766572616765223a2022434f4d504c455445222c202263617074757265223a2022666978747572652d31222c20226f72646572223a20312c2022726f7773223a205b5d7d7d"
+      },
+      "expected_result": {
+        "status": "INVALID",
+        "reason": "INVALID_FIXTURE",
+        "controller_coverage": null,
+        "target_coverage": null,
+        "controller_capture": null,
+        "target_capture": null,
+        "controller_outcome": null,
+        "target_fact": null,
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": null
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"INVALID\",\"controller_coverage\":null,\"target_coverage\":null,\"effect_sources\":[]}"
+    },
+    {
+      "id": "trailing-token",
+      "family": "invalid",
+      "nearest": "test_invalid_and_bounded_bytes",
+      "novelty": "A valid complete fixture followed by another JSON token.",
+      "stimulus": {
+        "kind": "bytes_hex",
+        "data": "7b2276657273696f6e223a20312c202264697370617463685f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303031222c2022636f6e74726f6c6c6572223a207b22636f766572616765223a2022434f4d504c455445222c202263617074757265223a2022666978747572652d31222c20226f72646572223a20312c2022726f7773223a205b5d7d2c2022746172676574223a207b22636f766572616765223a2022434f4d504c455445222c202263617074757265223a2022666978747572652d31222c20226f72646572223a20312c2022726f7773223a205b5d7d7d2074727565"
+      },
+      "expected_result": {
+        "status": "INVALID",
+        "reason": "INVALID_FIXTURE",
+        "controller_coverage": null,
+        "target_coverage": null,
+        "controller_capture": null,
+        "target_capture": null,
+        "controller_outcome": null,
+        "target_fact": null,
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": null
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"INVALID\",\"controller_coverage\":null,\"target_coverage\":null,\"effect_sources\":[]}"
+    },
+    {
+      "id": "duplicate-nested-decision",
+      "family": "invalid",
+      "nearest": "test_invalid_and_bounded_bytes",
+      "novelty": "Duplicate keys inside an otherwise valid nested approval record.",
+      "stimulus": {
+        "kind": "bytes_hex",
+        "data": "7b2276657273696f6e223a20312c202264697370617463685f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303031222c2022636f6e74726f6c6c6572223a207b22636f766572616765223a2022434f4d504c455445222c202263617074757265223a2022666978747572652d31222c20226f72646572223a20312c2022726f7773223a205b7b2264697370617463685f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303031222c2022616374696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303032222c2022646967657374223a202261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c202273657373696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303034222c202272756e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303035222c2022617070726f76616c5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303033222c20226f7574636f6d65223a2022554e4b4e4f574e222c20226576656e74223a207b2264697370617463685f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303031222c2022616374696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303032222c202273657373696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303034222c2022737461747573223a2022554e4b4e4f574e227d2c20226566666563745f6e756d626572223a206e756c6c2c2022616374696f6e223a207b22616374696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303032222c202273657373696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303034222c202272756e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303035227d2c2022617070726f76616c223a207b22616374696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303032222c202273657373696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303034222c202272756e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303035222c2022617070726f76616c5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303033222c2022636f6e73756d6564223a20747275652c20226465636973696f6e223a202252454a4543544544222c20226465636973696f6e223a2022415050524f564544227d7d5d7d2c2022746172676574223a207b22636f766572616765223a2022434f4d504c455445222c202263617074757265223a2022666978747572652d32222c20226f72646572223a20322c2022726f7773223a205b7b2264697370617463685f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303031222c2022616374696f6e5f6964223a202230303030303030302d303030302d343030302d383030302d303030303030303030303032222c2022646967657374223a202261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c20226566666563745f6e756d626572223a20317d5d7d7d"
+      },
+      "expected_result": {
+        "status": "INVALID",
+        "reason": "INVALID_FIXTURE",
+        "controller_coverage": null,
+        "target_coverage": null,
+        "controller_capture": null,
+        "target_capture": null,
+        "controller_outcome": null,
+        "target_fact": null,
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": null
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"INVALID\",\"controller_coverage\":null,\"target_coverage\":null,\"effect_sources\":[]}"
+    },
+    {
+      "id": "unavailable-source-with-rows",
+      "family": "invalid",
+      "nearest": "absent-source",
+      "novelty": "Explicit unavailability conflicts with positive rows.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-1",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": "UNKNOWN",
+                "event": {
+                  "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "status": "UNKNOWN"
+                },
+                "effect_number": null,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005",
+                  "approval_id": "00000000-0000-4000-8000-000000000003",
+                  "consumed": true,
+                  "decision": "APPROVED"
+                }
+              }
+            ]
+          },
+          "target": {
+            "coverage": "UNAVAILABLE",
+            "capture": "fixture-2",
+            "order": 2,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "effect_number": 1
+              }
+            ]
+          }
+        }
+      },
+      "expected_result": {
+        "status": "INVALID",
+        "reason": "INVALID_SOURCE",
+        "controller_coverage": "COMPLETE",
+        "target_coverage": "UNAVAILABLE",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2",
+        "controller_outcome": null,
+        "target_fact": null,
+        "effect_number": null,
+        "effect_sources": [],
+        "capture_order": null
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"INVALID\",\"controller_coverage\":\"COMPLETE\",\"target_coverage\":\"UNAVAILABLE\",\"effect_sources\":[]}"
+    },
+    {
+      "id": "maximum-capture-label-omitted",
+      "family": "diagnostic",
+      "nearest": "test_diagnostic_is_redacted_and_pure",
+      "novelty": "Valid maximum-length capture labels occur on the fully corroborated analyzer path and must be omitted.",
+      "stimulus": {
+        "kind": "fixture",
+        "case": {
+          "version": 1,
+          "dispatch_id": "00000000-0000-4000-8000-000000000001",
+          "controller": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-123456",
+            "order": 1,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "outcome": "UNKNOWN",
+                "event": {
+                  "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "status": "UNKNOWN"
+                },
+                "effect_number": null,
+                "action": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005"
+                },
+                "approval": {
+                  "action_id": "00000000-0000-4000-8000-000000000002",
+                  "session_id": "00000000-0000-4000-8000-000000000004",
+                  "run_id": "00000000-0000-4000-8000-000000000005",
+                  "approval_id": "00000000-0000-4000-8000-000000000003",
+                  "consumed": true,
+                  "decision": "APPROVED"
+                }
+              }
+            ]
+          },
+          "target": {
+            "coverage": "COMPLETE",
+            "capture": "fixture-654321",
+            "order": 2,
+            "rows": [
+              {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "effect_number": 1
+              }
+            ]
+          }
+        }
+      },
+      "expected_result": {
+        "status": "SIMULATED_EFFECT_RECORDED",
+        "reason": "BOUND_EFFECT",
+        "controller_coverage": "COMPLETE",
+        "target_coverage": "COMPLETE",
+        "controller_capture": "fixture-123456",
+        "target_capture": "fixture-654321",
+        "controller_outcome": "UNKNOWN",
+        "target_fact": "CLAIM_WITH_EFFECT",
+        "effect_number": 1,
+        "effect_sources": [
+          "TARGET"
+        ],
+        "capture_order": "CONTROLLER_FIRST"
+      },
+      "expected_diagnostic": "{\"version\":1,\"status\":\"SIMULATED_EFFECT_RECORDED\",\"controller_coverage\":\"COMPLETE\",\"target_coverage\":\"COMPLETE\",\"effect_sources\":[\"TARGET\"]}"
+    },
+    {
+      "id": "newline-source-rejected",
+      "family": "diagnostic",
+      "nearest": "test_diagnostic_unchecked_fields",
+      "novelty": "Reject a forged source literal with a line break and no diagnostic injection.",
+      "stimulus": {
+        "kind": "unchecked",
+        "constructor": "source",
+        "params": [
+          "TARGET\nCANARY_STAGE53"
+        ]
+      },
+      "expected_result": null,
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRECOGNIZED\",\"controller_coverage\":null,\"target_coverage\":null,\"effect_sources\":[]}"
+    },
+    {
+      "id": "oversize-before-object-inspection",
+      "family": "diagnostic",
+      "nearest": "test_diagnostic_unchecked_fields",
+      "novelty": "Oversized tuple must bail out before comparing or hashing any unchecked object.",
+      "stimulus": {
+        "kind": "unchecked",
+        "constructor": "oversize_guard",
+        "params": []
+      },
+      "expected_result": null,
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRECOGNIZED\",\"controller_coverage\":null,\"target_coverage\":null,\"effect_sources\":[]}"
+    },
+    {
+      "id": "status-subclass-no-custom-hooks",
+      "family": "diagnostic",
+      "nearest": "test_diagnostic_unchecked_fields",
+      "novelty": "Even a subclass shaped like a valid status must fail exact type checks without invoking hooks.",
+      "stimulus": {
+        "kind": "unchecked",
+        "constructor": "status_subclass",
+        "params": [
+          "UNRESOLVED"
+        ]
+      },
+      "expected_result": null,
+      "expected_diagnostic": "{\"version\":1,\"status\":\"UNRECOGNIZED\",\"controller_coverage\":null,\"target_coverage\":null,\"effect_sources\":[]}"
+    }
+  ]
+}

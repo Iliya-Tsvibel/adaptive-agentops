@@ -1,7 +1,6 @@
 # Stage 4 local acceptance report
 
-**ACCEPT LOCAL STAGE 4** is the recommendation. Formal acceptance belongs to the
-repository owner. Production remains **NO-GO**.
+**Owner decision: ACCEPTED — LOCAL STAGE 4 ONLY**, on 2026-11-26, as recorded in the [PR #24 owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). The original report recommended acceptance; the later owner decision formally closed that gate. Production remains **NO-GO**.
 
 The executable candidate is `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`, the reviewed and CI-tested
 Stage 4.7 squash merge. The native workflow exercised this exact revision.
@@ -139,12 +138,12 @@ work. [Campaign ledger](campaigns/stage4-progress.md)
 > Stage 4 local hardened acceptance evidence is complete at `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`.
 > The owner-authenticated native run passed 32/32 markers including the
 > live OS-authenticated requester, agent, approver and target path and
-> durable SQLite-only effect. Stage 4 owner sign-off is pending. Production
-> remains NO-GO.
+> durable SQLite-only effect. The owner formally accepted this local scope
+> on 2026-11-26 in PR #24. Production remains NO-GO.
 
 ## Recommended Stage 5 starting point
 
-After owner acceptance, draft a Stage 5 architecture and security contract
+Following the recorded local owner acceptance, draft a Stage 5 architecture and security contract
 for an operator-facing local reconciliation workflow. Start with read-only
 inspection and disposition of unresolved dispatch and target records.
 Specify operator identity, retention, capacity, backup and recovery, and

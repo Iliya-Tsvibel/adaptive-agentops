@@ -77,3 +77,30 @@ formatter-only cases were exempt from classification and provenance.
 The focused run passed 85 tests, including the existing regression tests.
 The publication PR records full regressions, exact implementation review,
 CI and merge evidence. Stage 5 native use remains 0/4.
+
+PR #30 merged at `ffdd6ddeede2cbc522936f1316fa8b23806daaa2`.
+Ordinary CI reported 1,840 passing tests on the reviewed candidate and
+the merge matched reviewed tree `b41840ce1f3cc330b10121ac06a186462b91c6bb`.
+[Stage 5.3 PR](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/30)
+· [Stage 5.3 CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45889456110)
+
+## Stage 5.4
+
+The independently reviewed contract limits reliability work to offline
+test scenarios. Its six focused tests passed in the local Python 3.12
+environment.
+[Stage 5.4 contract](../tasks/stage5/5.4-synthetic-reliability-contract.md)
+
+| Check | Initial state and fault | Observed behavior and preserved evidence | Recovery limit and operator action |
+| --- | --- | --- | --- |
+| R1 | Valid fixture, injected parser recursion failure | One parser call, invalid result and empty diagnostic attribution. Clean result and fixture bytes stayed intact. | Parser boundary only. Investigate repeatedly invalid synthetic input. |
+| R2 | Valid fixture, injected parse interruption | One parser call, propagated interruption, no returned result. The input stayed intact and a separate clean observation matched the control. | In-process interruption only. Inspect the interrupted analysis before relying on any result. |
+| R3 | Valid result, injected diagnostic serialization interruption | One serialization call, propagated interruption, no returned diagnostic. The input result stayed intact and a separate clean observation matched the control. | In-process interruption only. A diagnostic was unavailable for that invocation. |
+| R4 | Unresolved reservation, modeled unavailable and empty Target observations | Unresolved in all three observations, with coverage and missing-row distinction preserved. Earlier results and fixture bytes stayed intact. | Modeled evidence only. Investigate the unresolved reservation. |
+| R5 | Positive Controller evidence, modeled invalid or same-order null Target evidence | Invalid or inconsistent result, respectively. Both outputs suppressed positive attribution and the control evidence stayed intact. | Modeled evidence only. Investigate invalid or conflicting source records. |
+| R6 | Valid synthetic fixture, exact and exceeded byte and row bounds | Exact byte limit matched the control. Sixteen duplicate rows yielded inconsistency. Oversized inputs yielded invalid results. Input bytes stayed intact. | Decoder limits only. Review the rejection against the input contract. |
+
+Each check repeated under independent input construction and detected no
+external calls. These tests provide synthetic reliability evidence. The
+publication PR records full regressions, exact review, CI and merge
+evidence. Stage 5 native use remains 0/4. Production remains NO-GO.

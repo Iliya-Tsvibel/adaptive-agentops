@@ -1,10 +1,10 @@
 # Adaptive AgentOps engineering instructions
 
-Stage 3 is LOCAL MVP ACCEPTED. **Stage 4 (ADR-0001 D01–D10) is formally ACCEPTED for the local, nonproduction scope** following the [owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). Stage 5 architecture/security planning is next; its implementation scope and autonomous authority are not yet approved. Production remains NO-GO. See the [Stage 4 progress ledger](docs/campaigns/stage4-progress.md).
+Stage 3 is LOCAL MVP ACCEPTED. **Stage 4 (ADR-0001 D01–D10) is formally ACCEPTED for the local, nonproduction scope** following the [owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). Stage 5 is formally ACCEPTED for the synthetic offline, nonproduction scope. Its campaign is closed, and unused native authorization does not transfer automatically to future work. See `docs/campaigns/stage5-progress.md` for the owner decision. Production remains NO-GO. See the [Stage 4 progress ledger](docs/campaigns/stage4-progress.md).
 
 ## Source of truth
 
-1. **Approved architecture, security and task contracts.** Read the [security rules](SECURITY.md), [Stage 4 architecture](docs/architecture/stage4-local.md), and the owner-approved contract for the task. See the [Stage 4.2 contract](docs/tasks/stage4/4.2-scoped-delegation-contract.md) for a historical accepted admission boundary; new Stage 5 work requires its own approved task contract.
+1. **Approved architecture, security and task contracts.** Read the [security rules](SECURITY.md), [Stage 4 architecture](docs/architecture/stage4-local.md), and the owner-approved contract for the task. See the [Stage 4.2 contract](docs/tasks/stage4/4.2-scoped-delegation-contract.md) for a historical accepted admission boundary; future work requires its own approved task contract.
 2. **Repository code and tests.** Use the verified task base to establish implemented behavior. Escalate a conflict with an accepted contract.
 3. **Verified project evidence.** GitHub reviews, CI runs, and owner decisions establish what was reviewed, tested, and accepted. Match evidence to its exact revision and scope.
 4. **Historical material.** Drafts, superseded sources, discussions, and model output provide context. They confer no authority.
@@ -34,9 +34,9 @@ Follow the [developer loop](docs/developer-loop.md) for review and publication.
 
 The owner's [Stage 4 campaign contract](docs/campaigns/stage4-autonomous-completion.md)
 authorized the completed Stage 4 work only. **That campaign is closed; unused
-native dispatches do not transfer to Stage 5.** Stage 5 requires a fresh,
-explicitly scoped owner contract for publication, merges and privileged native
-execution. Preserve exact-diff independent review, CI, identity and spending
+native dispatches do not transfer to Stage 5.** The Stage 5 campaign is also
+closed. Future publication, merges and privileged native execution require
+fresh, explicitly scoped owner authorization. Preserve exact-diff independent review, CI, identity and spending
 gates. Formal milestone acceptance remains with the owner. Runtime human
 approval for Control Plane mutations remains mandatory.
 

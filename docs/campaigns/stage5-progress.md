@@ -55,3 +55,25 @@ bounded local JSON and has no authority over execution or audit state.
 Exact-diff review, regression and merge evidence are recorded in the
 publication PR. Native usage remains 0/4. Production remains NO-GO.
 [Stage 5.2 contract](../tasks/stage5/5.2-bounded-local-diagnostics-contract.md)
+
+## Stage 5.3
+
+The owner authorized the evaluation-only scope in PR #30, including
+independent freeze and exact-diff review, ordinary CI and a verified merge.
+[Owner authorization](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/30#issuecomment-7202319666)
+· [Stage 5.3 contract](../tasks/stage5/5.3-deterministic-evaluation-contract.md)
+
+The read-only oracle reviewer independently passed the pre-score v1
+freeze at SHA-256
+`7c7341a596ca034ea8f60cfbd932f7108e8c37b8b2af07579211d9cc44d0c755`.
+The reviewer verified four new cases per family, including equal capture
+order and distinct earlier-complete and earlier-partial provenance.
+The frozen v5 regression manifest contributes zero to the new denominator.
+
+The scored local run used Python 3.12.3 and two independent constructions
+per case. It passed 16/16 new cases, 4/4 per family, with 13/13 classifications,
+13/13 source provenance checks and zero failed critical checks. The three
+formatter-only cases were exempt from classification and provenance.
+The focused run passed 85 tests, including the existing regression tests.
+The publication PR records full regressions, exact implementation review,
+CI and merge evidence. Stage 5 native use remains 0/4.

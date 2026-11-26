@@ -23,6 +23,11 @@ on:
         type: boolean
         required: false
         default: false
+      include_stage47:
+        description: Include Stage 4.7 hardened local acceptance (requires Stage 4.3 through 4.6)
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -83,13 +88,15 @@ jobs:
           INCLUDE_STAGE44: ${{ inputs.include_stage44 }}
           INCLUDE_STAGE45: ${{ inputs.include_stage45 }}
           INCLUDE_STAGE46: ${{ inputs.include_stage46 }}
+          INCLUDE_STAGE47: ${{ inputs.include_stage47 }}
         run: |
-          case "$INCLUDE_STAGE43:$INCLUDE_STAGE44:$INCLUDE_STAGE45:$INCLUDE_STAGE46" in
-            true:true:true:true) pack=pack-stage46; run=run-stage46 ;;
-            true:true:true:false) pack=pack-stage45; run=run-stage45 ;;
-            true:true:false:false) pack=pack-stage44; run=run-stage44 ;;
-            true:false:false:false) pack=pack-stage43; run=run-stage43 ;;
-            false:false:false:false) pack=pack; run=run ;;
+          case "$INCLUDE_STAGE43:$INCLUDE_STAGE44:$INCLUDE_STAGE45:$INCLUDE_STAGE46:$INCLUDE_STAGE47" in
+            true:true:true:true:true) pack=pack-stage47; run=run-stage47 ;;
+            true:true:true:true:false) pack=pack-stage46; run=run-stage46 ;;
+            true:true:true:false:false) pack=pack-stage45; run=run-stage45 ;;
+            true:true:false:false:false) pack=pack-stage44; run=run-stage44 ;;
+            true:false:false:false:false) pack=pack-stage43; run=run-stage43 ;;
+            false:false:false:false:false) pack=pack; run=run ;;
             *) echo "Invalid native acceptance scope" >&2; exit 1 ;;
           esac
           if ! setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py"); then

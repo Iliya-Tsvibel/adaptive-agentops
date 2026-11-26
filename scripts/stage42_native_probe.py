@@ -68,7 +68,7 @@ def server(delegation, endpoint, uids, scenario, verify_effects):
     print(json.dumps(evidence))
 
 
-def effect_guard(*additional_modules, sqlite_database=None, unix_peer=None):
+def effect_guard(*additional_modules, sqlite_database=None, unix_peer=None, approval_schema=False):
     allowed_modules = {
         "adaptive_agentops.identity", "adaptive_agentops.policy", "adaptive_agentops.tool_requests",
         "adaptive_agentops.stage4_boundary", "adaptive_agentops.stage4_boundary.delegation",
@@ -97,10 +97,12 @@ def effect_guard(*additional_modules, sqlite_database=None, unix_peer=None):
                     pass
         if (event == "sqlite3.connect" and sqlite_database is not None
                 and len(args) == 1 and type(args[0]) is str):
+            if approval_schema and args[0] == ":memory:":
+                return
             try:
                 database = urlsplit(args[0])
                 if (database.scheme == "file" and not database.netloc and not database.fragment
-                        and database.query == "mode=rw"
+                        and (database.query == "mode=rw" or (approval_schema and database.query == "mode=ro"))
                         and Path(unquote(database.path)).resolve() == sqlite_database):
                     return
             except (ValueError, OSError, RuntimeError):

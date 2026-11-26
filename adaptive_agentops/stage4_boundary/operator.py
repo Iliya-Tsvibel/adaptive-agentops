@@ -184,6 +184,12 @@ def request_grant(
 
 
 class _Controller:
+    _parse_operator_request = staticmethod(_parse_request)
+    _request_limit = _REQUEST_LIMIT
+    _proposal_model = MockGetHealthProposal
+    _tool = delegation._TOOL
+    _policy = delegation.PolicyDecision.ALLOW
+
     def __init__(self, agent_uid: int, operators: tuple[OperatorIdentity, ...], *, store=None):
         self.agent_uid = agent_uid
         self.operators = MappingProxyType({operator.uid: operator for operator in operators})
@@ -210,7 +216,7 @@ class _Controller:
             return True
 
         try:
-            request = _parse_request(delegation._read_frame(connection, _REQUEST_LIMIT, deadline))
+            request = self._parse_operator_request(delegation._read_frame(connection, self._request_limit, deadline))
         except ProtocolError:
             self.record(operator.uid, None, OperatorResult.INVALID_REQUEST)
             return True
@@ -221,7 +227,7 @@ class _Controller:
         method = request.method
         journal_size = len(self.journal)
         try:
-            if _METHOD_ROLE[method] not in operator.roles or operator.principal != _REQUESTER:
+            if not self.allows(operator, method):
                 self.record(operator.uid, method, OperatorResult.METHOD_DENIED)
                 reply = _DENIED
             else:
@@ -239,6 +245,12 @@ class _Controller:
             pass  # The evidence records a decision, even if the peer disconnected.
         return True
 
+    def allows(self, operator, method):
+        return _METHOD_ROLE[method] in operator.roles and operator.principal == _REQUESTER
+
+    def handle_agent(self, connection, deadline):
+        return delegation._handle_connection(connection, self.admission, self.agent_uid, deadline)
+
     def authorized_request(self, uid: int, request: _Request, deadline: float) -> bytes | None:
         session = self.admission
         method = request.method
@@ -252,14 +264,14 @@ class _Controller:
             try:
                 decision = delegation.evaluate_policy(
                     session.context,
-                    MockGetHealthProposal(tool=delegation._TOOL, resource=delegation._RESOURCE, arguments={}),
+                    self._proposal_model(tool=self._tool, resource=delegation._RESOURCE, arguments={}),
                 )
             except Exception:
                 decision = None
-            if decision is not delegation.PolicyDecision.ALLOW:
+            if decision is not self._policy:
                 self.record(uid, method, OperatorResult.POLICY_DENIED)
                 return _DENIED
-            grant = session.new_grant(self.agent_uid, request.argument, session.clock.sample())
+            grant = session.new_grant(self.agent_uid, request.argument, session.clock.sample(), tool=self._tool)
         elif (
             grant is None or self.grantor_uid != uid
             or (method is GrantMethod.REVOKE and (
@@ -366,9 +378,7 @@ def _serve_controller(agent, operator, uids, controller):
                     if key.data:
                         keep_serving = controller.handle_operator(connection, deadline)
                     else:
-                        keep_serving = delegation._handle_connection(
-                            connection, controller.admission, uids.agent, deadline,
-                        )
+                        keep_serving = controller.handle_agent(connection, deadline)
                 if not keep_serving or counts[key.data] >= delegation._MAX_CONNECTIONS:
                     break
     return SessionEvidence(tuple(controller.journal), tuple(controller.admission.journal))

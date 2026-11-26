@@ -162,12 +162,12 @@ class _Session:
         if grant_seconds is not None:
             self.grant = self.new_grant(agent_uid, grant_seconds, self.clock.start)
 
-    def new_grant(self, agent_uid: int, seconds: int, sample: tuple[int, int]) -> _Grant:
+    def new_grant(self, agent_uid: int, seconds: int, sample: tuple[int, int], *, tool=_TOOL) -> _Grant:
         wall, elapsed = sample
         lifetime = seconds * _SECOND_NS
         return _Grant(
             uuid4(), self.session_id, self.context.run_id, agent_uid, self.context.agent_id,
-            _TOOL, _RESOURCE, self.context.environment, wall + lifetime, elapsed + lifetime,
+            tool, _RESOURCE, self.context.environment, wall + lifetime, elapsed + lifetime,
         )
 
     def observe_expiry(self, sample) -> None:
@@ -257,16 +257,16 @@ def _reject_constant(_value):
     raise ValueError("non-finite JSON constant")
 
 
-def _parse_proposal(frame: bytes) -> MockGetHealthProposal:
-    if not frame.startswith(_PROPOSAL):
+def _parse_proposal(frame: bytes, *, prefix=_PROPOSAL, model=MockGetHealthProposal):
+    if not frame.startswith(prefix):
         raise ProtocolError("unsupported admission frame")
     try:
-        text = frame[len(_PROPOSAL):].decode("utf-8")
+        text = frame[len(prefix):].decode("utf-8")
         decoder = json.JSONDecoder(object_pairs_hook=_unique_object, parse_constant=_reject_constant)
         payload, end = decoder.raw_decode(text)
         if end != len(text):
             raise ValueError("trailing proposal data")
-        return MockGetHealthProposal.model_validate(payload, strict=True)
+        return model.model_validate(payload, strict=True)
     except (ValueError, RecursionError) as exc:
         raise ProtocolError("invalid admission proposal") from exc
 

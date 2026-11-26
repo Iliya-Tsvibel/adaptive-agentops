@@ -3,6 +3,14 @@
 Adaptive AgentOps is a Secure AI Agent Control Plane project.
 Its flagship direction is controlled agent tool execution: proposals pass through deterministic policy, scoped approval where required, and audited execution.
 
+## Current status (2026-11-26)
+
+**Stage 4 accepted for the documented local scope. Production NO-GO.** Stage 4 hardened one separate local Linux profile using dedicated OS UIDs, mutual UDS/`SO_PEERCRED`, server-held scoped grants, authenticated operator roles, a protected Controller database, single-use dispatch authorization and Target-side SQLite replay/effect records. Stage 4 executable acceptance SHA: `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`; cumulative [native evidence 32/32](docs/stage4-acceptance.md), [owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). The effect was **SQLite-only simulated**; this is not production or real external exactly-once execution. Stage 5 observability, evals and reliability is next, pending architecture/security approval.
+
+The remaining Stage 2/3 sections below describe the historical **legacy/demo profile**, not the hardened local security guarantee. Study the engineering choices in [Interview Lab — Stages 0–4](docs/interview/README.md), and consult [ADR-0001](docs/decisions/ADR-0001-stage4-identity-boundaries.md) for accepted Stage 4 decisions.
+
+## Legacy Stage 2 architecture and workflow
+
 Stage 2 implements a local security MVP in Python and FastAPI, without an LLM or agent runtime.
 It supports a read-only mock health check and an approval-gated simulated restart of `demo-api`.
 
@@ -319,8 +327,6 @@ The mock API is unauthenticated and accepts direct POSTs outside the controller.
 Audit and action tables are neither tamper-proof nor generally append-only.
 See [Stage 2 security boundaries](docs/stage2-security.md) for the full contract and failure semantics.
 
-Future agent integration would submit proposals through these control points while keeping identity, approval, and execution authority outside agent-supplied input.
-Agent and LLM integration, real workload and operator authentication, protected targets, and production infrastructure adapters are deferred, not implemented features.
+Subsequent Stage 3 added a bounded local Ollama proposal path. Stage 4 implemented a **separate hardened local Linux profile** with OS-authenticated processes, scoped delegation, operator roles and protected SQLite simulated effects. These later capabilities do **not** retrofit or secure this legacy HTTP mock API. Real production workload federation, physical-human MFA, external infrastructure adapters and distributed effect guarantees remain deferred.
 
-This documentation is based on repository code, tests, dependencies, and CI at starting commit `9f765fb`.
-Canonical MasterBrief and PRD sources are not present in the local repository; alignment with their full contents could not be verified.
+The legacy sections used commit `9f765fb` as their source revision. The Stage 3 and Stage 4 reports record subsequent project status. The full original PRD is not complete: live GitHub/log source integration, provenance-based diagnosis and final Incident Investigator reporting remain deferred.

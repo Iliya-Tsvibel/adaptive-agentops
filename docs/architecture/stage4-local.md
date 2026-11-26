@@ -26,7 +26,7 @@ and verified.
 - [Stage 2 security](../stage2-security.md) and [Stage 3 acceptance](../stage3-acceptance.md) describe the trusted local MVP and its limits.
 - [Stage 4.1 native acceptance](../stage4-native-acceptance.md) covers the isolated, nonmutating authenticated IPC boundary at its recorded commit.
 - The Stage 4.2 scoped proposal-admission slice passed 11 native markers. [Contract](../tasks/stage4/4.2-scoped-delegation-contract.md) · [Native acceptance](../stage42-native-acceptance.md)
-- The Stage 4.7 cumulative run passed the local approval and SQLite-only target chain. Formal owner acceptance is pending. [Stage 4 acceptance report](../stage4-acceptance.md) · [Campaign ledger](../campaigns/stage4-progress.md)
+- The Stage 4.7 cumulative run passed 32/32 native markers for the local approval and SQLite-only target chain. The owner formally accepted the local scope on 2026-11-26 in [PR #24](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). [Stage 4 acceptance report](../stage4-acceptance.md) · [Campaign ledger](../campaigns/stage4-progress.md)
 
 ## Provenance and historical references
 

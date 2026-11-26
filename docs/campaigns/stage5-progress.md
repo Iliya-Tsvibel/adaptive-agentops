@@ -28,7 +28,20 @@ pre-commit independent review gate. Production remains NO-GO.
 
 Stage 5.0 reconciles the local offline-first plan with the actual stores
 and schemas. The earlier live-first draft remains historical proposal
-material. Required technical approval from the owner is pending. No
-Stage 5 implementation or runtime acceptance has occurred.
+material. The owner decision and resulting Stage 5.1 progress appear below.
 [Earlier draft #26](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/26)
 · [Stage 5.0 plan](../tasks/stage5/5.0-architecture-security-plan.md)
+
+## Stage 5.1
+
+The owner approved Stage 5.0 and the synthetic-only Stage 5.1 slice in the
+campaign conversation. PR #27 merged at `fd15fde5569df7a25e2bf848ff3b95605b681199`
+with the independently reviewed tree. The older draft #26 was closed.
+[Architecture PR](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/27)
+· [Architecture CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45833154701)
+
+Stage 5.1 adds a bounded pure projection and versioned fixtures. Its
+contract records the evidence and provenance rules. Native usage remains
+0/4. Ordinary CI and exact review evidence are recorded in the publication
+PR. Production remains NO-GO.
+[Stage 5.1 contract](../tasks/stage5/5.1-offline-fixture-contract.md)

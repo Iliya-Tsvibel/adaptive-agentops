@@ -116,7 +116,8 @@ unavailability, malformed inputs and diagnostic disclosure.
 ## Owner decision
 
 The owner formally accepted implementation revision
-`1002b9c838fb42041b45f6b73104bc87cc20490f` in the campaign conversation.
+`1002b9c838fb42041b45f6b73104bc87cc20490f` in the
+[formal GitHub owner decision](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/32#issuecomment-7203198226).
 The assessment was originally published at
 `0d87fffd9067b88e19c3227f72aadca87e7d3d5a`. Acceptance covers synthetic
 offline reconciliation, bounded redacted diagnostics, deterministic

@@ -52,3 +52,71 @@ def test_pure_processing(monkeypatch):
     assert result.effect_sources == ("TARGET",)
     assert offline.format_result(result) == "SIMULATED_EFFECT_RECORDED (BOUND_EFFECT)"
     blocked.assert_not_called()
+
+
+@pytest.mark.parametrize("record", CASES, ids=[record["name"] for record in CASES])
+def test_diagnostic_frozen_cases(record):
+    result = offline.analyze_fixture(json.dumps(record["case"]).encode())
+    before = result.model_dump_json()
+    sources = list(result.effect_sources) if result.status == "SIMULATED_EFFECT_RECORDED" else []
+    expected = json.dumps({
+        "version": 1, "status": record["expected"],
+        "controller_coverage": result.controller_coverage, "target_coverage": result.target_coverage,
+        "effect_sources": sources,
+    }, separators=(",", ":"))
+    diagnostic = offline.format_local_diagnostic(result)
+    assert diagnostic == expected == offline.format_local_diagnostic(result)
+    assert diagnostic.isascii() and len(diagnostic) <= 256
+    assert result.model_dump_json() == before
+
+
+class _Unexpected:
+    def __hash__(self):
+        pytest.fail("Diagnostic hashed an unchecked object")
+
+    def __eq__(self, other):
+        pytest.fail("Diagnostic compared an unchecked object")
+
+
+@pytest.mark.parametrize("fields", [
+    {}, {"status": "x" * 100_000}, {"status": _Unexpected()},
+    {"status": "UNRESOLVED", "controller_coverage": _Unexpected()},
+    {"status": "UNRESOLVED", "target_coverage": "capture-canary"},
+    {"status": "UNRESOLVED", "effect_sources": ("TARGET",) * 3},
+    {"status": "UNRESOLVED", "effect_sources": [_Unexpected()]},
+    {"status": "UNRESOLVED", "effect_sources": (_Unexpected(),)},
+])
+def test_diagnostic_unchecked_fields(fields):
+    result = offline.Result.model_construct(reason="secret-canary", **fields)
+    assert offline.format_local_diagnostic(result) == (
+        '{"version":1,"status":"UNRECOGNIZED","controller_coverage":null,'
+        '"target_coverage":null,"effect_sources":[]}'
+    )
+
+
+def test_diagnostic_rejects_other_inputs():
+    with pytest.raises(TypeError, match="^Expected an offline reconciliation Result$"):
+        offline.format_local_diagnostic(_Unexpected())
+
+
+def test_diagnostic_is_redacted_and_pure(monkeypatch):
+    result = offline.Result.model_construct(
+        status="SIMULATED_EFFECT_RECORDED", reason="secret-canary",
+        controller_capture="identifier-canary", target_capture="capture-canary", effect_number=9182,
+        effect_sources=("TARGET", "CONTROLLER"),
+    )
+    blocked = Mock(side_effect=AssertionError("External operation"))
+    with monkeypatch.context() as patch:
+        for destination in ("socket.socket", "sqlite3.connect", "builtins.open", "logging.getLogger"):
+            patch.setattr(destination, blocked)
+        diagnostic = offline.format_local_diagnostic(result)
+    assert diagnostic == (
+        '{"version":1,"status":"SIMULATED_EFFECT_RECORDED","controller_coverage":null,'
+        '"target_coverage":null,"effect_sources":["CONTROLLER","TARGET"]}'
+    )
+    duplicate = result.model_copy(update={"effect_sources": ("TARGET", "TARGET")})
+    assert json.loads(offline.format_local_diagnostic(duplicate))["effect_sources"] == ["TARGET"]
+    unresolved = result.model_copy(update={"status": "UNRESOLVED"})
+    assert json.loads(offline.format_local_diagnostic(unresolved))["effect_sources"] == []
+    assert result.effect_sources == ("TARGET", "CONTROLLER")
+    blocked.assert_not_called()

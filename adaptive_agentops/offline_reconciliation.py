@@ -1,7 +1,7 @@
 """Pure reconciliation of bounded synthetic Stage 5.1 evidence."""
 
 import json
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, UUID4
 
@@ -208,3 +208,49 @@ def analyze_fixture(data: bytes) -> Result:
 
 def format_result(result: Result) -> str:
     return f"{result.status} ({result.reason})"
+
+
+_DIAGNOSTIC_STATUSES = frozenset(get_args(Status))
+_DIAGNOSTIC_COVERAGES = frozenset(get_args(Coverage))
+_DIAGNOSTIC_SOURCES = ("CONTROLLER", "TARGET")
+_MAX_STATUS_LENGTH = max(map(len, _DIAGNOSTIC_STATUSES))
+_MAX_COVERAGE_LENGTH = max(map(len, _DIAGNOSTIC_COVERAGES))
+_MAX_SOURCE_LENGTH = max(map(len, _DIAGNOSTIC_SOURCES))
+_UNRECOGNIZED_DIAGNOSTIC = (
+    '{"version":1,"status":"UNRECOGNIZED","controller_coverage":null,'
+    '"target_coverage":null,"effect_sources":[]}'
+)
+
+
+def _allowed_diagnostic_token(value, allowed, max_length):
+    return type(value) is str and len(value) <= max_length and value in allowed
+
+
+def format_local_diagnostic(result: Result) -> str:
+    """Format a redacted synthetic diagnostic without performing I/O."""
+    if type(result) is not Result:
+        raise TypeError("Expected an offline reconciliation Result")
+
+    status = getattr(result, "status", None)
+    controller = getattr(result, "controller_coverage", None)
+    target = getattr(result, "target_coverage", None)
+    sources = getattr(result, "effect_sources", None)
+    if (
+        not _allowed_diagnostic_token(status, _DIAGNOSTIC_STATUSES, _MAX_STATUS_LENGTH)
+        or any(value is not None and not _allowed_diagnostic_token(
+            value, _DIAGNOSTIC_COVERAGES, _MAX_COVERAGE_LENGTH
+        ) for value in (controller, target))
+        or type(sources) is not tuple
+        or len(sources) > len(_DIAGNOSTIC_SOURCES)
+        or any(not _allowed_diagnostic_token(source, _DIAGNOSTIC_SOURCES, _MAX_SOURCE_LENGTH) for source in sources)
+    ):
+        return _UNRECOGNIZED_DIAGNOSTIC
+
+    return json.dumps({
+        "version": 1,
+        "status": status,
+        "controller_coverage": controller,
+        "target_coverage": target,
+        "effect_sources": [source for source in _DIAGNOSTIC_SOURCES if source in sources]
+        if status == "SIMULATED_EFFECT_RECORDED" else [],
+    }, ensure_ascii=True, separators=(",", ":"))

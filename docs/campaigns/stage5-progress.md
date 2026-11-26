@@ -45,3 +45,13 @@ contract records the evidence and provenance rules. Native usage remains
 0/4. Ordinary CI and exact review evidence are recorded in the publication
 PR. Production remains NO-GO.
 [Stage 5.1 contract](../tasks/stage5/5.1-offline-fixture-contract.md)
+
+## Stage 5.2
+
+The owner approved the exact bounded local diagnostics contract after
+independent architecture review. The implementation adds one opt-in
+formatter for synthetic Stage 5.1 results. It produces redacted and
+bounded local JSON and has no authority over execution or audit state.
+Exact-diff review, regression and merge evidence are recorded in the
+publication PR. Native usage remains 0/4. Production remains NO-GO.
+[Stage 5.2 contract](../tasks/stage5/5.2-bounded-local-diagnostics-contract.md)

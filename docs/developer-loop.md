@@ -2,10 +2,11 @@
 
 The [repository instructions](../AGENTS.md), [security rules](../SECURITY.md),
 and [approved architecture](architecture/stage4-local.md) define the
-boundaries. The owner preauthorizes reviewed squash merges and bounded
-privileged native dispatches inside the [Stage 4 campaign contract](campaigns/stage4-autonomous-completion.md).
-Outside the campaign scope, merge and privileged native execution require
-specific owner authorization. The owner retains formal milestone acceptance.
+boundaries. The [Stage 4 campaign contract](campaigns/stage4-autonomous-completion.md)
+was a bounded authorization for the completed Stage 4 campaign; it is **closed**.
+Its unused native dispatch allowance does not carry to Stage 5.
+Future merges and privileged native execution require their own approved scope,
+independent review, and specific owner authorization. The owner retains formal milestone acceptance.
 Runtime human approval for Control Plane mutations remains mandatory.
 Production remains NO-GO.
 

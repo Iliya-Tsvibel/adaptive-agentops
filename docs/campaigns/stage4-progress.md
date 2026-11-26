@@ -1,8 +1,8 @@
 # Stage 4 campaign progress ledger
 
-Checkpoint date: 2026-11-25 (Asia/Jerusalem).
+Checkpoint date: 2026-11-26 (Asia/Jerusalem).
 Verified starting `main`: `989b98424c99ae3be947bae5a34661cce86c28a5`.
-Latest verified `main`: `bb4fd26505993a7ce93f656f795024fcef86148c`.
+Latest executable acceptance revision: `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`.
 [Campaign contract](stage4-autonomous-completion.md) ·
 [ADR-0001](../decisions/ADR-0001-stage4-identity-boundaries.md)
 
@@ -17,11 +17,21 @@ Latest verified `main`: `bb4fd26505993a7ce93f656f795024fcef86148c`.
 | Stage 4.4 protected Controller state | Verified, owner acceptance pending | Reviewed head `6c53474b31ccb32fd061a1bd84877af7e645b070` merged as `e5ea24b7a4954d76e2de3a2c57b6eac8a6b0e943` with exact tested tree `9957c411e7efc2b97dc07e862089c8c4f7698cb6`. Independent review PASS, 311 focused and 1,656 full local tests; ordinary CI 1,656 passed. [PR #20](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/20) · [CI 45626541124](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45626541124) · [Native run 45626930749](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45626930749) · [Work-package contract](../tasks/stage4/4.4-protected-controller-state-contract.md) · [Native plan](../stage44-native-acceptance.md) |
 | Stage 4.5 OS-bound dispatch | Verified, owner acceptance pending | PR #21 merged as `6d618afd6bd33328ef9ecda0a99e023a86afaa8b`. Ordinary CI and independent review passed. Native dispatch 3 succeeded with 25/25 markers and independent evidence PASS. [PR #21](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/21) · [CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45681017591) · [Native job](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45681467288/job/139442818846) · [Work-package contract](../tasks/stage4/4.5-os-bound-dispatch-contract.md) · [Native plan](../stage45-native-acceptance.md) |
 | Stage 4.6 durable replay and effects | Verified, owner acceptance pending | PR #22 merged as `bb4fd26505993a7ce93f656f795024fcef86148c` with reviewed tree `0b579dd1608a01e4b74a96896dc7dca1ae79e945`. Ordinary CI passed 1,738 tests. Native dispatch 4 passed 28/28 markers. The PR records independent exact-diff and native review PASS. [PR #22](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/22) · [CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45691861904) · [Native job](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45692237741/job/139480419558) · [Work-package contract](../tasks/stage4/4.6-durable-target-replay-contract.md) · [Native plan](../stage46-native-acceptance.md) |
-| Stage 4.7 hardened local acceptance | In progress | Starts at the Stage 4.6 merge. [Work-package contract](../tasks/stage4/4.7-hardened-local-acceptance-contract.md) · [Native plan](../stage47-native-acceptance.md) |
+| Stage 4.7 hardened local acceptance | Verified, owner acceptance pending | PR #23 merged as `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`. 445 focused and 1,755 full ordinary-user tests passed. CI passed 1,755 tests. Native dispatch 5 passed 32/32 markers and independent review. [PR #23](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/23) · [CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45794474657) · [Native job](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45794902062/job/139822944001) · [Work-package contract](../tasks/stage4/4.7-hardened-local-acceptance-contract.md) · [Native plan](../stage47-native-acceptance.md) |
 
 ## Resume from this checkpoint
 
-- Campaign native dispatch 4 succeeded on the Stage 4.6 merge with Stage 4.3 through 4.6 selected, hosted Ubuntu 24.04.5 and a read-only token. The job log contains 28 distinct PASS markers. The merged PR records owner actor and triggering actor, attempt 1, and independent native PASS. Usage is **4/8**, with four fresh dispatches remaining.
+- The [owner acceptance report](../stage4-acceptance.md) records the
+  independent D01–D10 assessment and recommends ACCEPT LOCAL STAGE 4.
+  Formal owner acceptance is pending. Production remains NO-GO.
+- Campaign native dispatch 5 ran on the reviewed Stage 4.7 squash merge
+  `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`, attempt 1, with
+  `Iliya-Tsvibel` as both actors, hosted Ubuntu 24.04.5, read-only
+  contents and Stage 4.3 through 4.7 selected. Job `139822944001` succeeded
+  with 32/32 markers exactly once. Independent native assessment passed.
+  [Native run 45794902062](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45794902062)
+
+- Campaign native dispatch 4 succeeded on the Stage 4.6 merge with Stage 4.3 through 4.6 selected, hosted Ubuntu 24.04.5 and a read-only token. The job log contains 28 distinct PASS markers. The merged PR records owner actor and triggering actor, attempt 1, and independent native PASS. Usage at that checkpoint was **4/8**.
 
 - Campaign native dispatch 1 ran on the exact independently reviewed PR #18
   merge tree at `b2fd3a4eb013c40b5238798a78c0a31c66000d00`, attempt 1 with owner
@@ -65,13 +75,12 @@ Latest verified `main`: `bb4fd26505993a7ce93f656f795024fcef86148c`.
   repair registers those documents and their transitive Stage 4.3 sources
   and adds regressions for missing documents and required links. Renewed
   independent review and repaired CI passed. [Initial governance CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45623579277)
-- Campaign usage at this checkpoint is **4/8 native dispatches**. At least **6 ordinary
-  CI runs** are recorded, with **1 governance repair cycle**, and **0 escalations**.
-  Independent checks completed include PR #18 merge-gate reverification,
-  both governance reviews, the Stage 4.3 native evidence review and the
-  Stage 4.4 exact-diff security and native evidence reviews.
-  PR #18's original implementation, CI and initial correction review are
-  pre-campaign evidence.
+- Campaign usage is **5/8 native dispatches** and **six execution CI
+  runs**, with one governance CI repair and one local Stage 4.7 security
+  review repair. The documentation publication PR carries its own CI.
+  The PR #18 original implementation, CI and initial correction review
+  are historical. The Stage 4.7 report consolidates verified review
+  evidence and remaining limits.
 - Reconcile remote refs, PRs, reviewed diffs, CI and native jobs before taking
   action. Persist the next checkpoint after each merge and native run. Record a
   context or usage interruption as such and resume from the last verified gate.

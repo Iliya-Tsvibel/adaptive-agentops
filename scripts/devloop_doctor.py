@@ -21,6 +21,7 @@ STAGE44 = "docs/stage44-native-acceptance.md"
 STAGE45 = "docs/stage45-native-acceptance.md"
 STAGE46 = "docs/stage46-native-acceptance.md"
 STAGE47 = "docs/stage47-native-acceptance.md"
+STAGE4_REPORT = "docs/stage4-acceptance.md"
 CONTRACT42 = "docs/tasks/stage4/4.2-scoped-delegation-contract.md"
 CONTRACT43 = "docs/tasks/stage4/4.3-operator-delegation-contract.md"
 CONTRACT44 = "docs/tasks/stage4/4.4-protected-controller-state-contract.md"
@@ -38,8 +39,8 @@ REQUIRED_LINKS = {
     "SECURITY.md": {ARCHITECTURE, LOOP, CONTRACT42, "docs/stage2-security.md"},
     LOOP: {"AGENTS.md", "SECURITY.md", ARCHITECTURE, STAGE41, CONTRACT42, CAMPAIGN, LEDGER},
     CAMPAIGN: {ADR, ARCHITECTURE, LEDGER, LOOP, STAGE43, "SECURITY.md"},
-    LEDGER: {CAMPAIGN, ADR, STAGE41, CONTRACT42, STAGE43, CONTRACT44, STAGE44, CONTRACT45, STAGE45, CONTRACT46, STAGE46, CONTRACT47, STAGE47},
-    ARCHITECTURE: {ADR, STAGE41, STAGE42, CONTRACT42, "docs/stage2-security.md",
+    LEDGER: {CAMPAIGN, ADR, STAGE41, CONTRACT42, STAGE43, CONTRACT44, STAGE44, CONTRACT45, STAGE45, CONTRACT46, STAGE46, CONTRACT47, STAGE47, STAGE4_REPORT},
+    ARCHITECTURE: {ADR, STAGE41, STAGE42, CONTRACT42, STAGE4_REPORT, "docs/stage2-security.md",
                    "docs/stage3-acceptance.md"},
     ADR: {ARCHITECTURE, STAGE41, CONTRACT42},
     STAGE41: {ADR, STAGE42, NATIVE_RUN, SIGN_OFF},
@@ -53,6 +54,7 @@ REQUIRED_LINKS = {
     STAGE46: {CONTRACT46, STAGE45, CAMPAIGN},
     CONTRACT47: {ADR, CAMPAIGN},
     STAGE47: {CONTRACT47, STAGE46, CAMPAIGN},
+    STAGE4_REPORT: {ADR, CONTRACT47, STAGE47, LEDGER},
 }
 DOCS = sorted(set(REQUIRED_LINKS) | {
     STAGE42, CONTRACT42, "docs/stage2-security.md", "docs/stage3-acceptance.md",

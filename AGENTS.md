@@ -1,6 +1,6 @@
 # Adaptive AgentOps engineering instructions
 
-Stage 3 is LOCAL MVP ACCEPTED. **Stage 4 (ADR-0001 D01–D10) is formally ACCEPTED for the local, nonproduction scope** following the [owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). Stage 5 architecture/security planning is next; its implementation scope and autonomous authority are not yet approved. Production remains NO-GO. See the [Stage 4 progress ledger](docs/campaigns/stage4-progress.md) and [interview learning notes](docs/interview/README.md).
+Stage 3 is LOCAL MVP ACCEPTED. **Stage 4 (ADR-0001 D01–D10) is formally ACCEPTED for the local, nonproduction scope** following the [owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). Stage 5 architecture/security planning is next; its implementation scope and autonomous authority are not yet approved. Production remains NO-GO. See the [Stage 4 progress ledger](docs/campaigns/stage4-progress.md).
 
 ## Source of truth
 

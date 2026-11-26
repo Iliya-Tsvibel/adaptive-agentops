@@ -392,11 +392,15 @@ def test_stage45_scope_requires_the_complete_cumulative_source_allowlist(tmp_pat
     } == set(setup.STAGE45_SOURCES) | set(WHEELS)
 
 
-def test_stage46_staging_requires_the_explicit_cumulative_scope(tmp_path):
+@pytest.mark.parametrize("previous,selected", [
+    (setup.STAGE45_SOURCES, setup.STAGE46_SOURCES),
+    (setup.STAGE46_SOURCES, setup.STAGE47_SOURCES),
+])
+def test_staging_requires_the_explicit_cumulative_scope(tmp_path, previous, selected):
     with pytest.raises(RuntimeError, match="missing reviewed source"):
-        setup.stage_bundle(make_bundle(sources=setup.STAGE45_SOURCES), tmp_path, setup.STAGE46_SOURCES)
+        setup.stage_bundle(make_bundle(sources=previous), tmp_path, selected)
     assert not list(tmp_path.iterdir())
-    setup.stage_bundle(make_bundle(sources=setup.STAGE46_SOURCES), tmp_path, setup.STAGE46_SOURCES)
+    setup.stage_bundle(make_bundle(sources=selected), tmp_path, selected)
     assert {
         path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*") if path.is_file()
-    } == set(setup.STAGE46_SOURCES) | set(WHEELS)
+    } == set(selected) | set(WHEELS)

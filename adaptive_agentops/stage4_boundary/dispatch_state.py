@@ -279,10 +279,22 @@ def _load_fixture(store, fixture, context):
     return action, approval
 
 
+def _consume_fixture(conn, fixture, action, approval):
+    return conn.execute(
+        "UPDATE dispatch_approvals SET consumed = 1 WHERE approval_id = ? AND action_id = ? "
+        "AND session_id = ? AND consumed = 0",
+        (str(approval.approval_id), str(action.action_id), str(fixture.session_id)),
+    )
+
+
 def _reserve_fixture(store, session, fixture, connection, deadline):
+    return _reserve(store, session, fixture, connection, deadline, _load_fixture, _consume_fixture)
+
+
+def _reserve(store, session, authority, connection, deadline, load, consume):
     conn = store._connection
     with store._write():
-        action, approval = _load_fixture(store, fixture, session.context)
+        action, approval = load(store, authority, session.context)
         proposal = MockRestartServiceProposal.model_validate({
             "tool": action.tool, "resource": action.resource, "arguments": action.arguments.model_dump(),
         }, strict=True)
@@ -296,21 +308,17 @@ def _reserve_fixture(store, session, fixture, connection, deadline):
         _remaining(deadline)
         if not (
             _ns(action.created_at) <= _ns(approval.created_at) <= wall
-            < min(_ns(action.expires_at), _ns(approval.expires_at), fixture.wall_expiry)
-            and 0 < elapsed < fixture.elapsed_expiry
+            < min(_ns(action.expires_at), _ns(approval.expires_at), authority.wall_expiry)
+            and 0 < elapsed < authority.elapsed_expiry
         ):
-            raise controller_state.ControllerStateError("Dispatch fixture authority is expired or future-issued")
+            raise controller_state.ControllerStateError("Dispatch authority is expired or future-issued")
 
         dispatch_id = uuid4()
         values = (
             str(dispatch_id), str(action.action_id), str(approval.approval_id), str(session.session_id),
-            str(fixture.grant_id), action.action_fingerprint, _RESOURCE, wall, elapsed,
+            str(authority.grant_id), action.action_fingerprint, _RESOURCE, wall, elapsed,
         )
-        consumed = conn.execute(
-            "UPDATE dispatch_approvals SET consumed = 1 WHERE approval_id = ? AND action_id = ? "
-            "AND session_id = ? AND consumed = 0",
-            (str(approval.approval_id), str(action.action_id), str(session.session_id)),
-        )
+        consumed = consume(conn, authority, action, approval)
         if consumed.rowcount != 1:
             raise controller_state.ControllerStateError("Dispatch approval was not consumed exactly once")
         conn.execute("INSERT INTO dispatch_reservations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", values)
@@ -363,13 +371,15 @@ def _record_target_request(store, fixture, key):
         )
 
 
-def _coordinate(store, session, fixture, endpoint, uids, *, simulate=False):
+def _coordinate(store, session, fixture, endpoint, uids, *, simulate=False, reserve=None, request_deadline=None):
     if simulate:
         from . import target_state
 
     receipt = None
     with _connect_verified(endpoint, uids) as (connection, deadline):
-        permit = _reserve_fixture(store, session, fixture, connection, deadline)
+        if request_deadline is not None:
+            deadline = min(deadline, request_deadline)
+        permit = (reserve or _reserve_fixture)(store, session, fixture, connection, deadline)
         reservation = permit.consume(connection)
         try:
             envelope = _envelope(session, fixture, reservation, deadline)

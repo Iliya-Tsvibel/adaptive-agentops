@@ -126,7 +126,8 @@ the report PR. PR #32 published the assessment at
 · [Assessment CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45891352411)
 
 The owner accepted the synthetic offline scope at implementation revision
-`1002b9c838fb42041b45f6b73104bc87cc20490f` in the campaign conversation.
+`1002b9c838fb42041b45f6b73104bc87cc20490f` in the
+[formal GitHub owner decision](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/32#issuecomment-7203198226).
 This decision covers reconciliation, bounded redacted diagnostics,
 deterministic evaluations and synthetic reliability testing. Live capture,
 authenticated inspection, real storage recovery, production deployment

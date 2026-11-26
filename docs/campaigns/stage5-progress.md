@@ -1,5 +1,8 @@
 # Stage 5 progress ledger
 
+**Campaign closed. The owner accepted the synthetic offline, nonproduction
+Stage 5 scope. Production remains NO-GO.**
+
 Stage 4 closed on main `bd52eced886768ffee57336724c46cf4ebaeb6d2`,
 tree `26db8a0171a1409df8a754986132d65ca5983dde`. The accepted executable
 revision is `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`, with 32 native
@@ -116,6 +119,18 @@ pytest and exact-candidate CI each passed 1,846 tests.
 The assessment covers the verified synthetic implementation, frozen
 case results, six reliability scenarios and operating limits.
 The reviewer verdict and exact publication evidence are recorded with
-the report PR. The owner retains the formal local acceptance decision.
-Native usage remains 0/4. Production remains NO-GO.
+the report PR. PR #32 published the assessment at
+`0d87fffd9067b88e19c3227f72aadca87e7d3d5a`. Its exact-candidate CI passed
+1,846 tests.
+[Assessment PR](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/32)
+· [Assessment CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/45891352411)
+
+The owner accepted the synthetic offline scope at implementation revision
+`1002b9c838fb42041b45f6b73104bc87cc20490f` in the campaign conversation.
+This decision covers reconciliation, bounded redacted diagnostics,
+deterministic evaluations and synthetic reliability testing. Live capture,
+authenticated inspection, real storage recovery, production deployment
+and real infrastructure mutations are outside the accepted scope.
+Native usage closed at 0/4. Unused authorization does not transfer
+automatically to future work. Production remains NO-GO.
 [Stage 5 acceptance assessment](../stage5-acceptance.md)

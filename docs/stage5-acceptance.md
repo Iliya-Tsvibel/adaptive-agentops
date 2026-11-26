@@ -1,7 +1,7 @@
 # Stage 5 local acceptance assessment
 
-**Recommendation — ACCEPT LOCAL STAGE 5 for the synthetic offline scope.**
-Formal acceptance is reserved to the owner. **Production remains NO-GO.**
+**Owner decision — ACCEPT LOCAL STAGE 5 for the synthetic offline, nonproduction scope.**
+**Production remains NO-GO.**
 
 Stage 5 delivers a bounded synthetic evidence projector, an opt-in
 redacted diagnostic formatter, a frozen deterministic evaluation, and
@@ -110,12 +110,21 @@ unavailability, malformed inputs and diagnostic disclosure.
 > Stage 5 synthetic offline work is implemented and independently
 > assessed. The deterministic evaluation passed all 16 new frozen
 > cases with zero critical failures and the six reliability scenarios
-> passed. Stage 5 formal local acceptance is pending. Live evidence
+> passed. The owner formally accepted the synthetic offline scope. Live evidence
 > capture, authenticated inspection and production remain outside scope.
 
 ## Owner decision
 
-Accept the completed Stage 5 synthetic offline scope at the verified
-implementation revision above. Production remains NO-GO. Any live
-evidence capture, authenticated inspection or privileged security
-validation requires separately approved scope.
+The owner formally accepted implementation revision
+`1002b9c838fb42041b45f6b73104bc87cc20490f` in the campaign conversation.
+The assessment was originally published at
+`0d87fffd9067b88e19c3227f72aadca87e7d3d5a`. Acceptance covers synthetic
+offline reconciliation, bounded redacted diagnostics, deterministic
+evaluations and synthetic reliability testing. The decision cites
+independent review, 1,846 passing regression tests, 16/16 new evaluation
+cases, six reliability scenarios and verified PR, CI and tree evidence.
+
+Excluded scope includes live evidence capture, authenticated inspection,
+real storage recovery, production deployment and real infrastructure
+mutations. Stage 5 used 0/4 native dispatches. Unused authorization does
+not transfer automatically to future work. Production remains NO-GO.

@@ -13,7 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def sources(tmp_path):
-    relative_paths = [*doctor.DOCS, "evaluations/stage3_results.json"]
+    relative_paths = [
+        *doctor.DOCS,
+        "evaluations/stage3_results.json",
+        "tests/test_stage45_dispatch_state.py",
+        "tests/test_stage46_target_state.py",
+        "tests/test_stage47_hardened.py",
+    ]
     for relative in relative_paths:
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)

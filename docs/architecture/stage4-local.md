@@ -25,7 +25,8 @@ and verified.
 
 - [Stage 2 security](../stage2-security.md) and [Stage 3 acceptance](../stage3-acceptance.md) describe the trusted local MVP and its limits.
 - [Stage 4.1 native acceptance](../stage4-native-acceptance.md) covers the isolated, nonmutating authenticated IPC boundary at its recorded commit.
-- [Stage 4.2 contract](../tasks/stage4/4.2-scoped-delegation-contract.md) defines a fixture-issued, session-only proposal-admission slice. [Stage 4.2 native acceptance](../stage42-native-acceptance.md) remains pending separate owner authorization and evidence.
+- The Stage 4.2 scoped proposal-admission slice passed 11 native markers. [Contract](../tasks/stage4/4.2-scoped-delegation-contract.md) · [Native acceptance](../stage42-native-acceptance.md)
+- The Stage 4.7 cumulative run passed the local approval and SQLite-only target chain. Formal owner acceptance is pending. [Stage 4 acceptance report](../stage4-acceptance.md) · [Campaign ledger](../campaigns/stage4-progress.md)
 
 ## Provenance and historical references
 

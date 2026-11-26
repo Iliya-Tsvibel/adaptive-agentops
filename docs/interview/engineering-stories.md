@@ -1,6 +1,6 @@
 # Cross-Stage Interview Stories — Problem → Architecture → Evidence
 
-**Scope:** Reusable STAR-style stories from accepted local Stages 0–4. The user acted as project owner / architecture and acceptance decision maker, using Codex for much implementation. Avoid overstating hands-on code ownership or production readiness.
+**Scope:** Reusable STAR-style stories from local project work across Stages 0–4. The user acted as project owner / architecture and acceptance decision maker, using Codex for much implementation. Avoid overstating hands-on code ownership or production readiness.
 
 ## Story A — Securing an LLM tool call
 

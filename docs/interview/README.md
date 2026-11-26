@@ -1,6 +1,6 @@
 # Adaptive AgentOps — Interview Lab (Stages 0–4)
 
-**Purpose:** study the engineering choices, failure paths, security guarantees and evidence of the accepted local project. These are *learning notes*, not new normative architecture decisions or claims of production readiness.
+**Purpose:** study the engineering choices, failure paths, security guarantees and evidence of the local project. These are *learning notes*, not new normative architecture decisions or claims of production readiness.
 
 **Study order:**
 1. [Stage 0 — Environment and engineering foundations](stage-00-environment.md)
@@ -26,12 +26,12 @@ Do not memorize an impressive story you cannot reproduce. Open the relevant code
 
 ## Current claims and provenance
 
-- Accepted project scope: **Stages 0–4 local/nonproduction**; production **NO-GO**.
+- These notes cover Stages 0–4. The Stage 4 owner decision covers the local, nonproduction scope. Production remains **NO-GO**.
 - Stage 4 executable acceptance SHA: `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`; owner acceptance: [PR #24 comment](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211).
 - Stage 4 cumulative native evidence: [32/32 markers](../stage4-acceptance.md) on a disposable native Ubuntu runner.
 - Earlier acceptance and limitations: [Stage 2 security](../stage2-security.md), [Stage 3 acceptance](../stage3-acceptance.md).
 - Normative identity decisions: [ADR-0001](../decisions/ADR-0001-stage4-identity-boundaries.md).
-- Stage 1 normative historical source: **Corrected Baseline v0.1.1** in the ChatGPT IT Projects Project Sources (PRD, Architecture, Threat Model, Permission Matrix, Decision Record). It predates implementation.
+- Stage 1 historical specification source: **Corrected Baseline v0.1.1** in the ChatGPT IT Projects Project Sources (PRD, Architecture, Threat Model, Permission Matrix, Decision Record). It predates implementation.
 - Stage 0 source: completed Environment Setup & Audit Project Source, not a comprehensive inventory of installed tool versions.
 
 ### Words that must not be conflated

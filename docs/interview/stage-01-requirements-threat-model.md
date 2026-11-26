@@ -1,6 +1,6 @@
 # Stage 1 — Requirements, Architecture, Threat Model and Permission Matrix
 
-**Status:** Corrected Baseline v0.1.1 accepted as the Stage 1 specification, *not* a proof of running code.
+**Historical specification:** Corrected Baseline v0.1.1 records the Stage 1 design and a conditional recommendation to proceed with Stage 2.
 
 ## Problem / product use case
 
@@ -16,7 +16,7 @@ Stage 1 produced five artifacts: MVP Scope/PRD, Architecture, Threat Model, Perm
 2. **G2 / R2 — separate local operator:** approval is recorded only through an operator CLI, never through the agent or requester HTTP interface. This initially assumed trusted local OS and did **not** authenticate an independent human.
 3. **G3 / R7 — split test ownership:** Stage 2 proves deterministic gateway controls before LLM integration; Stage 3 verifies model boundaries. Stage 4 later hardens identity and separation of privileges.
 
-The original v0.1 Work review was NO-GO for missing specification clarity. The corrected v0.1.1 allowed moving to Stage 2; that initial NO-GO is **historical design feedback**, not evidence of an implementation breach.
+The original v0.1 Work review was NO-GO for missing specification clarity. The corrected v0.1.1 recommended moving to Stage 2 after adopting the corrected baseline; that initial NO-GO is **historical design feedback**, not evidence of an implementation breach.
 
 ## HOW — core architecture vocabulary
 
@@ -30,7 +30,7 @@ The original v0.1 Work review was NO-GO for missing specification clarity. The c
 - **Audit:** separately records decision, reservation and observed result.
 - **Tool adapter:** a bounded connection to the mock API. LLM content must pass the PEP.
 
-### Trust boundaries from the accepted threat model
+### Trust boundaries from the Stage 1 threat model
 
 | Boundary | Threat | Minimum control |
 | --- | --- | --- |

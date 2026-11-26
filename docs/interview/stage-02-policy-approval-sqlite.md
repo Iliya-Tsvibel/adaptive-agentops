@@ -16,7 +16,7 @@ Build a deterministic tool authorization path *before* introducing an LLM. A mod
 6. The separate local operator CLI reviews exact stored scope and commits `APPROVED` or `REJECTED` for one action. A typed terminal confirmation **does not** cryptographically verify a human.
 7. The Controller freshly rechecks action, approval, run/agent/scope, fingerprint, expiry, unconsumed status and current PDP decision.
 8. In one SQLite `BEGIN IMMEDIATE` transaction it **consumes approval, inserts unique dispatch reservation and records `DISPATCH_RESERVED`**. Only a *confirmed* commit permits at most one Controller-mediated attempt.
-9. The fixed mock HTTP adapter attempts one POST without transport retries, redirects or proxy changes; outcome is recorded separately. `ACKNOWLEDGED` means the mock responded, not that a real service recovered.
+9. The fixed mock HTTP adapter attempts one POST with transport retries, redirects and environment proxies disabled; outcome is recorded separately. `ACKNOWLEDGED` means the Controller validated the simulated acknowledgement and confirmed its result commit.
 
 ## WHY these constructs exist
 

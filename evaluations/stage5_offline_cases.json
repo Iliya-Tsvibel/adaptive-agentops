@@ -1,0 +1,1711 @@
+{
+  "version": 5,
+  "cases": [
+    {
+      "name": "target-resolves-unknown",
+      "expected": "SIMULATED_EFFECT_RECORDED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      },
+      "expected_facts": {
+        "effect_sources": [
+          "TARGET"
+        ],
+        "effect_number": 1,
+        "reason": "BOUND_EFFECT",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2"
+      }
+    },
+    {
+      "name": "both-committed",
+      "expected": "SIMULATED_EFFECT_RECORDED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "SIMULATED_EFFECT_COMMITTED",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "SIMULATED_EFFECT_COMMITTED"
+              },
+              "effect_number": 1,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      },
+      "expected_facts": {
+        "effect_sources": [
+          "CONTROLLER",
+          "TARGET"
+        ],
+        "effect_number": 1,
+        "reason": "BOUND_EFFECT",
+        "controller_capture": "fixture-1",
+        "target_capture": "fixture-2"
+      }
+    },
+    {
+      "name": "claim-without-effect",
+      "expected": "UNRESOLVED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "snapshot-skew-missing-target",
+      "expected": "UNRESOLVED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-0",
+          "order": 0,
+          "rows": []
+        }
+      }
+    },
+    {
+      "name": "missing-digest",
+      "expected": "UNRESOLVED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": null,
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      }
+    },
+    {
+      "name": "wrong-action",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000003",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "wrong-dispatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000003",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "wrong-digest",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "duplicate",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            },
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "orphan",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-3",
+          "order": 3,
+          "rows": []
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "earlier-controller",
+      "expected": "UNRESOLVED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "partial",
+      "expected": "UNRESOLVED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "PARTIAL",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "absent-source",
+      "expected": "UNAVAILABLE",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        },
+        "target": {
+          "coverage": "UNAVAILABLE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      }
+    },
+    {
+      "name": "both-missing",
+      "expected": "MISSING_EVIDENCE",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      }
+    },
+    {
+      "name": "corrupt-source",
+      "expected": "INVALID",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "INVALID",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      }
+    },
+    {
+      "name": "no-send",
+      "expected": "CONTROLLER_NO_SEND_RECORDED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "RESERVED_NO_SEND",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "RESERVED_NO_SEND"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      }
+    },
+    {
+      "name": "contradictory-no-send",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "RESERVED_NO_SEND",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "RESERVED_NO_SEND"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "uncorroborated",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": false,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "unbound-outcome",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": null,
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "approval-action_id-mismatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000099",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "approval-approval_id-mismatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000099",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "approval-session_id-mismatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000099",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "approval-run_id-mismatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000099",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "complete-missing-pre-send-digest",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 3,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": null,
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "later-absent",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "SIMULATED_EFFECT_COMMITTED",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "SIMULATED_EFFECT_COMMITTED"
+              },
+              "effect_number": 1,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": []
+        }
+      },
+      "expected_facts": {
+        "effect_sources": [],
+        "reason": "LATER_TARGET_EVIDENCE_CONFLICT"
+      }
+    },
+    {
+      "name": "later-null",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "SIMULATED_EFFECT_COMMITTED",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "SIMULATED_EFFECT_COMMITTED"
+              },
+              "effect_number": 1,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": null
+            }
+          ]
+        }
+      },
+      "expected_facts": {
+        "effect_sources": [],
+        "reason": "LATER_TARGET_EVIDENCE_CONFLICT"
+      }
+    },
+    {
+      "name": "earlier-absent",
+      "expected": "SIMULATED_EFFECT_RECORDED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "SIMULATED_EFFECT_COMMITTED",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "SIMULATED_EFFECT_COMMITTED"
+              },
+              "effect_number": 1,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 0,
+          "rows": []
+        }
+      },
+      "expected_facts": {
+        "effect_sources": [
+          "CONTROLLER"
+        ],
+        "reason": "BOUND_EFFECT"
+      }
+    },
+    {
+      "name": "earlier-null",
+      "expected": "SIMULATED_EFFECT_RECORDED",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "SIMULATED_EFFECT_COMMITTED",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "SIMULATED_EFFECT_COMMITTED"
+              },
+              "effect_number": 1,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 0,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": null
+            }
+          ]
+        }
+      },
+      "expected_facts": {
+        "effect_sources": [
+          "CONTROLLER"
+        ],
+        "reason": "BOUND_EFFECT"
+      }
+    },
+    {
+      "name": "no-send-event-action_id-mismatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "RESERVED_NO_SEND",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000099",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "RESERVED_NO_SEND"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      },
+      "expected_facts": {
+        "reason": "EVENT_BINDING_CONFLICT"
+      }
+    },
+    {
+      "name": "no-send-event-dispatch_id-mismatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "RESERVED_NO_SEND",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000099",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "RESERVED_NO_SEND"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      },
+      "expected_facts": {
+        "reason": "EVENT_BINDING_CONFLICT"
+      }
+    },
+    {
+      "name": "no-send-event-session_id-mismatch",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "RESERVED_NO_SEND",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000099",
+                "status": "RESERVED_NO_SEND"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": []
+        }
+      },
+      "expected_facts": {
+        "reason": "EVENT_BINDING_CONFLICT"
+      }
+    },
+    {
+      "name": "partial-unconsumed-approval",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "PARTIAL",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": false,
+                "decision": "APPROVED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "consumed-rejection",
+      "expected": "INCONSISTENT",
+      "case": {
+        "version": 1,
+        "dispatch_id": "00000000-0000-4000-8000-000000000001",
+        "controller": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-1",
+          "order": 1,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "session_id": "00000000-0000-4000-8000-000000000004",
+              "run_id": "00000000-0000-4000-8000-000000000005",
+              "approval_id": "00000000-0000-4000-8000-000000000003",
+              "outcome": "UNKNOWN",
+              "event": {
+                "dispatch_id": "00000000-0000-4000-8000-000000000001",
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "status": "UNKNOWN"
+              },
+              "effect_number": null,
+              "action": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005"
+              },
+              "approval": {
+                "action_id": "00000000-0000-4000-8000-000000000002",
+                "session_id": "00000000-0000-4000-8000-000000000004",
+                "run_id": "00000000-0000-4000-8000-000000000005",
+                "approval_id": "00000000-0000-4000-8000-000000000003",
+                "consumed": true,
+                "decision": "REJECTED"
+              }
+            }
+          ]
+        },
+        "target": {
+          "coverage": "COMPLETE",
+          "capture": "fixture-2",
+          "order": 2,
+          "rows": [
+            {
+              "dispatch_id": "00000000-0000-4000-8000-000000000001",
+              "action_id": "00000000-0000-4000-8000-000000000002",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "effect_number": 1
+            }
+          ]
+        }
+      },
+      "expected_facts": {
+        "reason": "CONTROLLER_EVIDENCE_CONFLICT"
+      }
+    }
+  ]
+}

@@ -44,13 +44,28 @@ A blocked result requires investigation before relying on the affected gate.
 5. **Merge gate:** Require verified scope, matching reviewed and tested trees, passing CI, independent review PASS, and resolution of blocking findings. Squash merge when the task's owner-granted merge authority and all applicable gates allow it. Disclose residual risks in the evidence record.
 6. **Native evidence:** When required, apply the active task's authorized native dispatch gates, including exact merged SHA, verified owner identity, approved runner and workflow, spending policy and the dispatch budget. Require the actual job and marker evidence and independent verification before progression.
 
-Record the reviewed base SHA and an exact diff fingerprint, the published
-head SHA, review verdict and findings, local and CI test counts and links,
-remaining limitations, and any repairs. For example, fingerprint the
-reviewed Git diff with `git diff --binary <base> | sha256sum` and compare
-after committing with `git diff --binary <base> <head>`. A patch ID alone
-does not verify the exact reviewed tree. Stop if a mismatch, blocker, or
-unverifiable gate cannot be resolved inside the task and repair budget.
+## Review evidence
+
+Preserve the independent reviewer's original report or a clearly revisioned,
+attributed copy. Record the reviewer identity or agent context, its separation
+from the Builder, the read-only restrictions used, and any limitations.
+Distinguish independent reviewer reports from submitted GitHub review objects
+and platform approvals. Do not reconstruct missing historical artifacts or
+claim a review, signature, approval or test execution without evidence.
+
+Bind each report to the exact base and candidate tree. Stage the complete
+candidate, record its tree with `git write-tree`, and hash the bytes from
+`git diff --cached --binary --no-ext-diff --no-textconv --no-renames --no-color <base>`
+with SHA-256. The Reviewer independently records the same identifiers and
+fingerprint from the candidate. After publication, record the head SHA and
+compare the tree and the corresponding base-to-head diff using the same
+options. Include findings, severity, disposition and repair history, with a
+new report revision for every changed candidate. Record actual local commands
+and results, CI run and job links, the tested checkout SHA and tree, and the
+merged SHA and tree. Retain an immutable or revisioned artifact, such as a
+commit-addressed report or a separately preserved report per review revision.
+A patch ID alone cannot verify the reviewed tree. Stop on unresolved
+mismatches or unverifiable gates.
 
 ## Post-merge retrospective
 
@@ -64,11 +79,13 @@ out of repository evidence.
 
 ## Ordinary GitHub CI
 
-The **CI** workflow runs on pull requests into `main`. Once GitHub registers
+The **CI** workflow runs on pull requests into `main` and on manual dispatch.
+A squash merge alone does not trigger post-merge CI. Compare the tree
+actually tested by the PR job with the merged tree. Once GitHub registers
 `workflow_dispatch` from the default branch, use **Actions → CI → Run workflow**
 for a manual run. A newer run cancels an older run for the same ref. The test
-job has a 10-minute timeout. This private repository uses standard GitHub-hosted
-runner minutes. Apply the established zero-spend policy before opening a PR,
+job has a 10-minute timeout. This public repository uses standard GitHub-hosted
+runners. Apply the established zero-spend policy before opening a PR,
 which can start CI. Stop for evidence of changed spending risk.
 
 The runner checks out the code with read-only repository access and disables

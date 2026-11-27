@@ -53,9 +53,16 @@ STAGE47_SOURCES = STAGE46_SOURCES + (
     "scripts/stage47_native_acceptance.py",
     "scripts/stage47_native_probe.py",
 )
+STAGE6E_SOURCES = STAGE47_SOURCES + (
+    "adaptive_agentops/stage4_boundary/evidence_inspection.py",
+    "adaptive_agentops/stage4_boundary/evidence_source.py",
+    "scripts/stage6e_native_acceptance.py",
+    "scripts/stage6e_native_probe.py",
+)
+_STAGE6E_SCOPE = 60
 _SCOPE_SOURCES = {
     42: SOURCES, 43: STAGE43_SOURCES, 44: STAGE44_SOURCES, 45: STAGE45_SOURCES,
-    46: STAGE46_SOURCES, 47: STAGE47_SOURCES,
+    46: STAGE46_SOURCES, 47: STAGE47_SOURCES, _STAGE6E_SCOPE: STAGE6E_SOURCES,
 }
 DRIVER = "scripts/stage42_native_acceptance.py"
 CODE_PARENT = Path("/var/lib")
@@ -130,8 +137,11 @@ def pack(revision, wheelhouse, output, sources=SOURCES):
 
 
 def stage_bundle(source, stage, sources=SOURCES):
-    data = source.read(BUNDLE_LIMIT + 1)
-    require(len(data) <= BUNDLE_LIMIT, "Staging bundle exceeds size limit")
+    limit = BUNDLE_LIMIT
+    if sources == STAGE6E_SOURCES:
+        limit += (len(STAGE6E_SOURCES) - len(STAGE47_SOURCES)) * SOURCE_LIMIT
+    data = source.read(limit + 1)
+    require(len(data) <= limit, "Staging bundle exceeds size limit")
     with ZipFile(BytesIO(data)) as bundle:
         entries = bundle.infolist()
         seen = set()

@@ -6,8 +6,9 @@ Starting main verified through GitHub at
 
 | Package | Status |
 | --- | --- |
-| 6.E.0 | [Architecture proposal](../decisions/ADR-0002-stage6-evidence-bridge.md). Independent review required before security-sensitive implementation. |
-| 6.E.1–6.E.4 | Pending architecture gate. |
+| 6.E.0 | [Architecture proposal](../decisions/ADR-0002-stage6-evidence-bridge.md). Merged with independent architecture review. |
+| 6.E.1–3 | Merged after exact-diff repair review. |
+| 6.E.4 | Operator demo and native harness. |
 | Native and technical assessment | Pending reviewed implementation. 0/8 authorized native runs used. |
 
 ## 6.E.0 verification
@@ -18,3 +19,21 @@ CI-tested tree `bc74743ca308459c18059edb24c877dcf0f84232`. The exact
 review is preserved in the PR. [CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/46002807782)
 passed 1,865 tests. The review cleared security implementation within the
 ADR scope.
+
+## 6.E.1–3 verification
+
+[PR #39](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/39) merged as
+`66cfe2c502915e68efa06df535f8b06305802af7`. Exact reviewed and CI-tested tree
+`07b229df352ae99cc83674934fd3b2edef162b63`. The PR preserves two independent
+review revisions and the disposition of three Medium contract findings.
+Builder focused tests passed 30. Full local pytest and
+[ordinary CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/46003867103)
+each passed 1,895. The CI checked out synthetic PR merge
+`de4826d550416eb5da4751f17edf71511a9fe6b4` with the same tree.
+
+## 6.E.4 and native preparation
+
+The [operator demo](../tasks/stage6e/operator-demo.md) and
+[customer objections](../portfolio/customer-objections.md) record the
+workflow and limits. Native acceptance requires its own exact-revision
+dispatch, job and marker evidence. Native use remains 0/8 at this checkpoint.

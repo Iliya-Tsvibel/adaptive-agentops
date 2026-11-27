@@ -1,0 +1,98 @@
+name: Stage 6.E native Linux acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed main commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage6e-native-acceptance
+
+jobs:
+  native-acceptance:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Iliya-Tsvibel/adaptive-agentops' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'Iliya-Tsvibel' &&
+      github.triggering_actor == 'Iliya-Tsvibel' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Verify authorized revision
+        env:
+          EXPECTED_STAGE6E_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [[ ! "$EXPECTED_STAGE6E_SHA" =~ ^[0-9a-f]{40}$ || "$GITHUB_SHA" != "$EXPECTED_STAGE6E_SHA" ]]; then
+            echo "::error title=Stage 6.E setup failure::Selected main revision does not match the reviewed SHA"
+            exit 1
+          fi
+          printf 'Stage 6.E reviewed revision %s\n' "$GITHUB_SHA"
+
+      - name: Check out approved main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download hash-pinned wheels as the runner user
+        run: |
+          trap 'if [[ $? -ne 0 ]]; then echo "::error title=Stage 6.E setup failure::Runner preflight or wheel download failed" >&2; fi' EXIT
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test "$(id -u)" -ne 0
+          command -v systemd-detect-virt >/dev/null
+          release=$(cat /proc/sys/kernel/osrelease)
+          if systemd-detect-virt --container --quiet; then
+            echo "A native Linux VM outside containers is required." >&2
+            exit 1
+          else
+            test "$?" -eq 1
+          fi
+          if [[ ${release,,} =~ microsoft|wsl ]]; then
+            echo "A native Linux VM outside containers and WSL is required." >&2
+            exit 1
+          fi
+          mkdir -m 0700 "$RUNNER_TEMP/stage6e-wheels"
+          /usr/bin/python3.12 -I -B -S scripts/stage42_native_acceptance.py pins .github/ci-requirements.txt \
+            > "$RUNNER_TEMP/stage6e-wheels/requirements.txt"
+          env -i PATH=/usr/bin:/bin PIP_CONFIG_FILE=/dev/null \
+            /usr/bin/python3.12 -I -B -m pip --isolated --disable-pip-version-check --no-cache-dir \
+            download --index-url https://pypi.org/simple --only-binary=:all: --require-hashes \
+            --dest "$RUNNER_TEMP/stage6e-wheels" -r "$RUNNER_TEMP/stage6e-wheels/requirements.txt"
+
+      - name: Stage and run the reviewed evidence probes offline under distinct UIDs
+        run: |
+          pack=pack-stage60
+          run=run-stage60
+          if ! setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py"); then
+            echo "::error title=Stage 6.E setup failure::Reviewed setup source unavailable"
+            exit 1
+          fi
+          set +e
+          /usr/bin/python3.12 -I -B -S -c "$setup" "$pack" "$GITHUB_SHA" "$RUNNER_TEMP/stage6e-wheels" |
+            sudo -n /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+              /usr/bin/timeout --signal=INT --kill-after=5s 270s \
+              /usr/bin/unshare --net -- /usr/bin/sh -ec '
+                if ! /usr/sbin/ip link set dev lo up; then
+                  echo "::error title=Stage 6.E setup failure::Could not initialize isolated loopback" >&2
+                  exit 1
+                fi
+                exec /usr/bin/python3.12 -I -B -S -c "$1" "$2"
+              ' sh "$setup" "$run"
+          statuses=("${PIPESTATUS[@]}")
+          if [[ ${statuses[0]} -ne 0 || ${statuses[1]} -ne 0 && ${statuses[1]} -ne 79 ]]; then
+            echo "::error title=Stage 6.E infrastructure failure::Runner setup or execution infrastructure failed (pack=${statuses[0]}, run=${statuses[1]})"
+            exit 1
+          fi
+          exit "${statuses[1]}"

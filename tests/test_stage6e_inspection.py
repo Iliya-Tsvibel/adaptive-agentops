@@ -1,10 +1,12 @@
 from contextlib import closing, contextmanager, nullcontext
+from datetime import datetime, timezone
 import sqlite3
 from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
 
+from adaptive_agentops import actions, approvals
 from adaptive_agentops.stage4_boundary import Endpoint, IdentityError, Link, ProtocolError, TrustedUIDs, monotonic
 from adaptive_agentops.stage4_boundary import controller_state as state, evidence_inspection as bridge
 from adaptive_agentops.stage4_boundary import hardened, operator, target_state
@@ -26,6 +28,17 @@ EXEC_ENDPOINTS = (
 
 @pytest.fixture
 def historical_unknown(profile, monkeypatch, clock):
+    historical_time = datetime(2026, 1, 1, 0, 0, 1, tzinfo=timezone.utc)
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return historical_time.astimezone(tz)
+
+    # Match both Stage 4 wall-clock sources to one deterministic history.
+    clock[0] = bridge.dispatch._ns(historical_time) - 1_000_000_000
+    monkeypatch.setattr(actions, "datetime", FixedDatetime)
+    monkeypatch.setattr(approvals, "datetime", FixedDatetime)
     target_connection(monkeypatch)
     send = Mock(side_effect=OSError("receipt lost"))
     monkeypatch.setattr(target_state, "_exchange", send)
@@ -232,3 +245,53 @@ def test_target_connect_and_exchange_share_the_absolute_deadline(monkeypatch):
     with boundary._connect_as(TARGET_SOCKET, CONTROL, TARGET, deadline=10.25) as (peer, deadline):
         assert peer is connection and deadline == 10.25
     connection.settimeout.assert_called_once_with(0.25)
+
+
+def test_capture_interruption_releases_no_evidence(monkeypatch):
+    scope = bridge.InspectorScope(INSPECTOR, uuid4())
+    monkeypatch.setattr(bridge, "_require_peer", Mock())
+    audit = Mock()
+    monkeypatch.setattr(bridge, "_audit", audit)
+    peer = Mock(recv=Mock(side_effect=[bridge._REQUEST + scope.dispatch_id.bytes, b""]))
+    capture = Mock(side_effect=KeyboardInterrupt)
+    with pytest.raises(KeyboardInterrupt):
+        bridge._inspect_peer(peer, monotonic() + 2, scope, None, capture)
+    capture.assert_called_once()
+    audit.assert_not_called()
+    peer.sendall.assert_not_called()
+
+
+def test_audit_capacity_prevents_disclosure(tmp_path, monkeypatch):
+    monkeypatch.setattr(state, "_check_ancestor", lambda _: None)
+    monkeypatch.setattr(bridge, "_require_peer", Mock())
+    monkeypatch.setattr(bridge, "_AUDIT_LIMIT", 1)
+    directory = tmp_path / "audit"
+    directory.mkdir(mode=0o700)
+    bridge.provision_inspection_audit(directory, CONTROL)
+    scope = bridge.InspectorScope(INSPECTOR, uuid4())
+    result = bridge.EvidenceDiagnostic(result="UNRESOLVED", controller="UNKNOWN", target="UNKNOWN")
+    with state._state_lease(directory, CONTROL) as fd:
+        with state._database(fd, CONTROL, bridge._AUDIT_DB) as conn:
+            for allowed in (True, False):
+                peer = Mock(recv=Mock(side_effect=[bridge._REQUEST + scope.dispatch_id.bytes, b""]))
+                bridge._inspect_peer(peer, monotonic() + 2, scope, state._ControllerStore(conn),
+                                     lambda _: result)
+                assert peer.sendall.called is allowed
+            assert conn.execute("SELECT count(*) FROM disclosures").fetchone() == (1,)
+
+
+def test_corrupt_controller_file_is_invalid(tmp_path, monkeypatch):
+    monkeypatch.setattr(state, "_check_ancestor", lambda _: None)
+    directory = tmp_path / "history"
+    directory.mkdir(mode=0o700)
+    corrupt = directory / state.DATABASE_NAME
+    canary = b"corrupt-private-source"
+    corrupt.write_bytes(canary)
+    corrupt.chmod(0o600)
+    lookup = Mock()
+    monkeypatch.setattr(target_state, "lookup_target_receipt", lookup)
+    reply = acquire(directory, bridge.InspectorScope(INSPECTOR, uuid4()))
+    assert (reply.result, reply.controller, reply.target) == ("INCONSISTENT", "INVALID", "NOT_QUERIED")
+    assert canary not in reply.model_dump_json().encode("ascii")
+    assert corrupt.read_bytes() == canary
+    lookup.assert_not_called()

@@ -9,7 +9,7 @@ Starting main verified through GitHub at
 | 6.E.0 | [Architecture proposal](../decisions/ADR-0002-stage6-evidence-bridge.md). Merged with independent architecture review. |
 | 6.E.1–3 | Merged after exact-diff repair review. |
 | 6.E.4 | Operator demo and native harness. |
-| Native and technical assessment | Pending reviewed implementation. 0/8 authorized native runs used. |
+| Native and technical assessment | 7/7 Stage 6.E markers and 32/32 cumulative Stage 4 markers. 2/8 native runs used. Pending formal owner acceptance. |
 
 ## 6.E.0 verification
 
@@ -50,3 +50,16 @@ stopped before any new marker. Its injected OSError crossed a state lease
 that wraps OSError, so the probe did not catch the modeled acknowledgment
 loss. The run failed with exit 79. Count it as a run and no Stage 6.E
 acceptance evidence. The repair is confined to the disposable probe.
+
+[PR #41](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/41) merged
+the independently reviewed fixture repair as
+`1066bfde6f3af6e7d2356e2c1a88dd2a15a9aa74`, shared reviewed and CI-tested
+tree `faeb68fc4041a8ed798cc774186e331c50f7e919`.
+[Ordinary CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/46005580486)
+passed 1,895 tests.
+
+[Native run 2](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/46005768880/job/140528417433)
+on that exact revision passed **7/7 Stage 6.E** and **32/32 cumulative Stage 4**
+markers, all distinct. Usage **2/8**. See the [technical assessment](../stage6e-acceptance.md)
+for observed properties, limitations and both native attempts. No additional
+paid spending. Formal Stage 6.E acceptance remains with the owner.

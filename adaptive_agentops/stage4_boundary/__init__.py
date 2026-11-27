@@ -218,7 +218,7 @@ def _connect_verified(endpoint: Endpoint, uids: TrustedUIDs):
 
 
 @contextmanager
-def _connect_as(endpoint: Endpoint, client_uid: int, server_uid: int):
+def _connect_as(endpoint: Endpoint, client_uid: int, server_uid: int, *, deadline: float | None = None):
     _require_local_uid(client_uid)
     with _socket_directory(endpoint, server_uid) as (fd, name, address):
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
@@ -226,16 +226,19 @@ def _connect_as(endpoint: Endpoint, client_uid: int, server_uid: int):
             before = _entry(fd, name)
             _check_endpoint(before, server_uid, endpoint.access_gid, expected_mode)
             _reject_acls(address)
-            connection.settimeout(_CONNECT_SECONDS)
+            connect_timeout = _CONNECT_SECONDS if deadline is None else min(_CONNECT_SECONDS, _remaining(deadline))
+            connection.settimeout(connect_timeout)
             connection.connect(address)
-            deadline = monotonic() + _EXCHANGE_SECONDS
+            exchange_deadline = monotonic() + _EXCHANGE_SECONDS
+            if deadline is not None:
+                exchange_deadline = min(deadline, exchange_deadline)
             _require_peer(connection, server_uid)
             after = _entry(fd, name)
             _check_endpoint(after, server_uid, endpoint.access_gid, expected_mode)
             _reject_acls(address)
             if not _same_entry(before, after):
                 raise PathSecurityError("socket entry changed during connection")
-            yield connection, deadline
+            yield connection, exchange_deadline
 
 
 @contextmanager

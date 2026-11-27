@@ -9,3 +9,12 @@ Starting main verified through GitHub at
 | 6.E.0 | [Architecture proposal](../decisions/ADR-0002-stage6-evidence-bridge.md). Independent review required before security-sensitive implementation. |
 | 6.E.1–6.E.4 | Pending architecture gate. |
 | Native and technical assessment | Pending reviewed implementation. 0/8 authorized native runs used. |
+
+## 6.E.0 verification
+
+[PR #38](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/38) merged as
+`6a8062a081e2cd560e67a29764e74d1b2d25ef59` with independently reviewed and
+CI-tested tree `bc74743ca308459c18059edb24c877dcf0f84232`. The exact
+review is preserved in the PR. [CI](https://github.com/Iliya-Tsvibel/adaptive-agentops/actions/runs/46002807782)
+passed 1,865 tests. The review cleared security implementation within the
+ADR scope.

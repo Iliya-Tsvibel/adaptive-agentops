@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, UUID4, model_validator
 
 from . import (
-    Endpoint, ProtocolError, TrustedUIDs, _EXCHANGE_SECONDS, _connect_verified, _listen, _remaining,
+    Endpoint, ProtocolError, TrustedUIDs, _EXCHANGE_SECONDS, _connect_as, _connect_verified, _listen, _remaining,
     _require_local_uid, _require_peer, _send_frame, monotonic,
 )
 from . import controller_state, delegation, dispatch_wire
@@ -193,11 +193,15 @@ def _exchange(connection, deadline, envelope, *, clock):
     return receipt
 
 
-def lookup_target_receipt(endpoint: Endpoint, uids: TrustedUIDs, key: ReceiptKey) -> ReceiptResult:
+def lookup_target_receipt(
+    endpoint: Endpoint, uids: TrustedUIDs, key: ReceiptKey, *, deadline: float | None = None,
+) -> ReceiptResult:
     """Read a correlated receipt over authenticated IPC, without reserving or sending a mutation."""
     wire = dispatch_wire
     wire._require_dispatch_link(endpoint)
-    with _connect_verified(endpoint, uids) as (peer, deadline):
+    connect = (_connect_verified(endpoint, uids) if deadline is None
+               else _connect_as(endpoint, *endpoint._uids(uids), deadline=deadline))
+    with connect as (peer, deadline):
         _send_frame(peer, wire._encode_frame(_LOOKUP, key), deadline)
         frame = delegation._read_frame(peer, wire._FRAME_MAX, deadline)
         result = wire._parse_frame(frame, _LOOKUP_REPLY, ReceiptResult)

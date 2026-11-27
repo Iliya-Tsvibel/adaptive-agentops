@@ -1,4 +1,4 @@
-# Adaptive AgentOps — Interview Lab (Stages 0–4)
+# Adaptive AgentOps — Interview Lab (Stages 0–5)
 
 **Purpose:** study the engineering choices, failure paths, security guarantees and evidence of the local project. These are *learning notes*, not new normative architecture decisions or claims of production readiness.
 
@@ -8,7 +8,8 @@
 3. [Stage 2 — Deterministic authorization and transactions](stage-02-policy-approval-sqlite.md)
 4. [Stage 3 — Local LLM, tool boundaries and evaluation](stage-03-llm-evals.md)
 5. [Stage 4 — Linux identity, delegation, dispatch and replay](stage-04-identity-delegation.md)
-6. [Cross-stage interview stories and the autonomous development loop](engineering-stories.md)
+6. [Stage 5 — Synthetic offline reconciliation, diagnostics, evaluations and reliability](stage-05-offline-reconciliation-evals-reliability.md)
+7. [Cross-stage interview stories and the autonomous development loop](engineering-stories.md)
 
 ## Reading protocol
 
@@ -26,9 +27,10 @@ Do not memorize an impressive story you cannot reproduce. Open the relevant code
 
 ## Current claims and provenance
 
-- These notes cover Stages 0–4. The Stage 4 owner decision covers the local, nonproduction scope. Production remains **NO-GO**.
+- These notes cover Stages 0–5. Stage 4 is accepted for its bounded local identity/dispatch scope; Stage 5 is separately accepted for synthetic offline, nonproduction reconciliation only. Production remains **NO-GO**.
 - Stage 4 executable acceptance SHA: `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`; owner acceptance: [PR #24 comment](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211).
 - Stage 4 cumulative native evidence: [32/32 markers](../stage4-acceptance.md) on a disposable native Ubuntu runner.
+- Stage 5 accepted implementation: `1002b9c838fb42041b45f6b73104bc87cc20490f`; [formal owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/32#issuecomment-7203198226), [acceptance report](../stage5-acceptance.md). Post-acceptance hardening [PR #36](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/36) added 19 regressions; the final documented CI count is 1,865. Stage 5 native use 0/4, closed.
 - Earlier acceptance and limitations: [Stage 2 security](../stage2-security.md), [Stage 3 acceptance](../stage3-acceptance.md).
 - Normative identity decisions: [ADR-0001](../decisions/ADR-0001-stage4-identity-boundaries.md).
 - Stage 1 historical specification source: **Corrected Baseline v0.1.1** in the ChatGPT IT Projects Project Sources (PRD, Architecture, Threat Model, Permission Matrix, Decision Record). It predates implementation.

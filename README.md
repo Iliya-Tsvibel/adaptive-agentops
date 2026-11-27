@@ -62,9 +62,9 @@ python -m pip install '.[dev]'
 python -m pytest -q
 ```
 
-The `dev` extra is needed for this local workflow: it includes HTTPX (used by the adapters) and pytest.
-FastAPI and Uvicorn are base dependencies; Pydantic is supplied through FastAPI.
-Versions use lower bounds rather than a lockfile.
+The `dev` extra supplies pytest. FastAPI, Uvicorn, HTTPX and Pydantic are
+base dependencies. GitHub CI installs the hash-pinned wheels in
+[its requirements file](.github/ci-requirements.txt).
 
 Run tests sequentially.
 The real loopback integration tests require exclusive use of `127.0.0.1:8001` and start and stop their own mock server.

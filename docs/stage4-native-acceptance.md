@@ -17,8 +17,8 @@ separate native acceptance gate. Production remains NO-GO.
 [Stage 4.2 native acceptance](stage42-native-acceptance.md)
 
 For a future run from `main`, the owner (`Iliya-Tsvibel`) must separately
-authorize privileged execution. Confirm the private repository has included
-Actions minutes and paid overage is disabled. The owner selects `main` in
+authorize privileged execution. Confirm the public repository can use standard
+GitHub-hosted runners without paid overage. The owner selects `main` in
 **Actions → Stage 4.1 native Linux acceptance → Run workflow**. GitHub's actor
 and triggering actor must both be the owner. The privileged job runs only on
 an owner dispatch or an owner rerun of an owner dispatch. A rerun uses the

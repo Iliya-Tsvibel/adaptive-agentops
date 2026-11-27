@@ -12,6 +12,10 @@ from uuid import UUID
 INSPECTOR, INSPECTORS = 60106, 60116
 
 
+class ModeledReceiptLoss(RuntimeError):
+    pass
+
+
 def main():
     if not (sys.flags.isolated and sys.flags.no_site and sys.flags.dont_write_bytecode):
         raise RuntimeError("Expected isolated native probe")
@@ -80,8 +84,11 @@ def main():
         print("DENIED")
     elif mode in {"target-lose-ack", "target-lookup", "target-claim-only"} and uid == uids.target:
         if mode == "target-lose-ack":
-            def suppress_receipt(_peer, _frame, _deadline):
-                raise BrokenPipeError("Modeled lost receipt after effect commit")
+            def suppress_receipt(_peer, frame, _deadline):
+                if not frame.startswith(target_state._RECEIPT):
+                    raise RuntimeError("Receipt loss seam reached by unexpected operation")
+                # The Target state lease maps OSError to a state error.
+                raise ModeledReceiptLoss
             target_state._send_frame = suppress_receipt
         if mode == "target-claim-only":
             commit = state._commit
@@ -93,7 +100,7 @@ def main():
             state._commit = exit_after_claim
         try:
             reply = target_state.serve_target_once(target, uids, target_dir)
-        except BrokenPipeError:
+        except ModeledReceiptLoss:
             if mode != "target-lose-ack":
                 raise
         else:

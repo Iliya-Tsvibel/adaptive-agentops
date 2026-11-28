@@ -1,6 +1,6 @@
 # ADR-0003 — Docker Security Portability
 
-**PROPOSED. Production NO-GO.**
+**TECHNICALLY REVIEWED AND TESTED. Formal owner acceptance pending. Production NO-GO.**
 
 Evaluate a hybrid nonproduction profile on a disposable Linux VM. Only the
 Agent client is containerized. Controller, Target, requester, approver,
@@ -35,3 +35,16 @@ container replacement and formal owner acceptance remain separate gates.
 [Docker PID settings](https://docs.docker.com/reference/cli/docker/container/run/#pid-settings---pid) ·
 [Docker UID and GID mapping](https://docs.docker.com/engine/security/rootless/uid-gid-mapping/) ·
 [Linux PID namespaces](https://man7.org/linux/man-pages/man7/pid_namespaces.7.html)
+
+## Completion review
+
+Retain the assessed implementation at
+`af410f24e353b466657006fb5d14a92125ee7382`. The launch pins the image
+digest and committed client source and excludes nested bind mounts.
+The diagnostic probe validates effective identity, private PID membership,
+read-only root and both binds, no capabilities, no-new-privileges, active
+seccomp and loopback-only networking. A digest pins image content. It
+does not establish publisher attestation. The trusted holder and rootful
+daemon remain provisioning and availability dependencies. No application
+or launch change was justified for the existing scope. See the
+[exact revision and actual Docker evidence](../stage6d-technical-assessment.md).

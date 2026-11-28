@@ -3,7 +3,7 @@
 Adaptive AgentOps is a Secure AI Agent Control Plane project.
 Its flagship direction is controlled agent tool execution: proposals pass through deterministic policy, scoped approval where required, and audited execution.
 
-## Current status (2026-11-26)
+## Current status
 
 **Stage 4 accepted for the documented local scope. Production NO-GO.** Stage 4 hardened one separate local Linux profile using dedicated OS UIDs, mutual UDS/`SO_PEERCRED`, server-held scoped grants, authenticated operator roles, a protected Controller database, single-use dispatch authorization and Target-side SQLite replay/effect records. Stage 4 executable acceptance SHA: `34c38d9087b5c34b97fa3d4b68cafc3dc8219e0a`; cumulative [native evidence 32/32](docs/stage4-acceptance.md), [owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). The effect was **SQLite-only simulated**; this is not production or real external exactly-once execution.
 
@@ -13,6 +13,15 @@ bounded redacted diagnostics, deterministic evaluations and synthetic
 reliability testing at `1002b9c838fb42041b45f6b73104bc87cc20490f`.
 Live capture, authenticated inspection and real storage recovery remain
 outside that scope. Native usage closed at 0/4. Production remains NO-GO.
+
+**Stage 6.E accepted and closed for documented native Linux, local,
+nonproduction inspection.** See the
+[owner decision](docs/campaigns/stage6e-progress.md).
+
+**Stage 6 technically complete for the tested Docker Agent hybrid, pending
+owner acceptance.** Kubernetes and runtime GitOps are deferred, and the
+owner retains the final scope decision. See the
+[technical assessment](docs/stage6-technical-assessment.md).
 
 The remaining Stage 2/3 sections below describe the historical **legacy/demo profile**, not the hardened local security guarantee. Study the engineering choices in [Interview Lab — Stages 0–4](docs/interview/README.md), and consult [ADR-0001](docs/decisions/ADR-0001-stage4-identity-boundaries.md) for accepted Stage 4 decisions.
 

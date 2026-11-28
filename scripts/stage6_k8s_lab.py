@@ -1,6 +1,7 @@
 """Trusted disposable-runner bootstrap and Argo reconciliation checks."""
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -132,6 +133,7 @@ def argo(install, repo, revision):
                                "- apiGroups: ['']\n  kinds: [Pod, Event]\n  clusters: ['*']\n",
     }}))
     for kind, name in (("deployment", "argocd-repo-server"), ("statefulset", "argocd-application-controller")):
+        k("-n", ARGO, "rollout", "restart", f"{kind}/{name}")
         k("-n", ARGO, "rollout", "status", f"{kind}/{name}", "--timeout=150s")
 
     apply(resource("v1", "ServiceAccount", ACCOUNT, NS, automountServiceAccountToken=False),
@@ -187,16 +189,25 @@ class GitSource:
         run(*args, "push", str(self.bare), "lab")
         return run(*args, "rev-parse", "HEAD").stdout.strip()
 
-    def serve(self):
+    def serve(self, initial):
+        if os.getuid() == 0:
+            raise RuntimeError("Git source must run as the unprivileged lab publisher")
         run("docker", "run", "-d", "--name", GIT_CONTAINER, "--network", "kind", "--read-only", "--cap-drop=ALL",
-            "--security-opt=no-new-privileges", "--user=65534:65534",
+            "--security-opt=no-new-privileges", f"--user={os.getuid()}:{os.getgid()}",
             "--mount", f"type=bind,source={self.bare.parent},target=/served,readonly", IMAGE,
-            "git", "-c", "safe.directory=/served/lab.git", "daemon", "--reuseaddr", "--listen=0.0.0.0", "--port=9418", "--base-path=/served",
-            "--export-all", "--strict-paths", "--disable=receive-pack", "--forbid-override=receive-pack",
-            "/served/lab.git")
+            "python", "-I", "-B", "/opt/aao/scripts/stage6_git_http.py", "0.0.0.0", "8080", "/served")
         address = run("docker", "inspect", "--format", "{{.NetworkSettings.Networks.kind.IPAddress}}",
                       GIT_CONTAINER).stdout.strip()
-        return f"git://{address}:9418/lab.git"
+        repo = f"http://{address}:8080/lab.git"
+        wait_for("Git smart HTTP branch advertisement", lambda: run(
+            "git", "ls-remote", repo, "refs/heads/lab", check=False, timeout=10,
+        ).stdout.startswith(initial), seconds=15)
+        run("git", "-C", str(self.root), "fetch", repo, initial)
+        denied = run("git", "-C", str(self.root), "push", repo, "lab:forbidden", check=False)
+        if not denied.returncode or "403" not in denied.stderr:
+            raise RuntimeError("Git source did not explicitly deny a remote push")
+        print("Git smart HTTP preflight resolved and fetched the reviewed revision and denied push", flush=True)
+        return repo
 
 
 def observe(revision, note):
@@ -242,7 +253,7 @@ def main():
     admission()
     source = GitSource(directory)
     initial = source.commit("initial")
-    repo = source.serve()
+    repo = source.serve(initial)
     argo(install, repo, initial)
     observe(initial, "initial")
     reconcile_role(False)

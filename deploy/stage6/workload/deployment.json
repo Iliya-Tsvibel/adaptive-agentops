@@ -1,0 +1,311 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "adaptive-agentops",
+    "annotations": {
+      "aao.example/lab-note": "initial"
+    }
+  },
+  "spec": {
+    "replicas": 1,
+    "strategy": {
+      "type": "Recreate"
+    },
+    "selector": {
+      "matchLabels": {
+        "app": "adaptive-agentops"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "adaptive-agentops"
+        }
+      },
+      "spec": {
+        "automountServiceAccountToken": false,
+        "enableServiceLinks": false,
+        "shareProcessNamespace": true,
+        "securityContext": {
+          "supplementalGroupsPolicy": "Merge",
+          "seccompProfile": {
+            "type": "RuntimeDefault"
+          }
+        },
+        "containers": [
+          {
+            "name": "agent",
+            "image": "adaptive-agentops-stage6:local",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/bin/sleep",
+              "infinity"
+            ],
+            "securityContext": {
+              "runAsUser": 60101,
+              "runAsGroup": 60101,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "proposal",
+                "mountPath": "/lab/proposal",
+                "readOnly": true
+              }
+            ]
+          },
+          {
+            "name": "controller",
+            "image": "adaptive-agentops-stage6:local",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/bin/sleep",
+              "infinity"
+            ],
+            "securityContext": {
+              "runAsUser": 60102,
+              "runAsGroup": 60102,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "proposal",
+                "mountPath": "/lab/proposal",
+                "readOnly": false
+              },
+              {
+                "name": "operator",
+                "mountPath": "/lab/operator",
+                "readOnly": false
+              },
+              {
+                "name": "inspection",
+                "mountPath": "/lab/inspection",
+                "readOnly": false
+              },
+              {
+                "name": "controller-state",
+                "mountPath": "/lab/controller-state",
+                "readOnly": false
+              },
+              {
+                "name": "audit-state",
+                "mountPath": "/lab/audit-state",
+                "readOnly": false
+              },
+              {
+                "name": "target",
+                "mountPath": "/lab/target",
+                "readOnly": true
+              }
+            ]
+          },
+          {
+            "name": "target",
+            "image": "adaptive-agentops-stage6:local",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/bin/sleep",
+              "infinity"
+            ],
+            "securityContext": {
+              "runAsUser": 60103,
+              "runAsGroup": 60103,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "target",
+                "mountPath": "/lab/target",
+                "readOnly": false
+              },
+              {
+                "name": "target-state",
+                "mountPath": "/lab/target-state",
+                "readOnly": false
+              }
+            ]
+          },
+          {
+            "name": "requester",
+            "image": "adaptive-agentops-stage6:local",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/bin/sleep",
+              "infinity"
+            ],
+            "securityContext": {
+              "runAsUser": 60104,
+              "runAsGroup": 60104,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "operator",
+                "mountPath": "/lab/operator",
+                "readOnly": true
+              }
+            ]
+          },
+          {
+            "name": "approver",
+            "image": "adaptive-agentops-stage6:local",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/bin/sleep",
+              "infinity"
+            ],
+            "securityContext": {
+              "runAsUser": 60105,
+              "runAsGroup": 60105,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "operator",
+                "mountPath": "/lab/operator",
+                "readOnly": true
+              }
+            ]
+          },
+          {
+            "name": "inspector",
+            "image": "adaptive-agentops-stage6:local",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/bin/sleep",
+              "infinity"
+            ],
+            "securityContext": {
+              "runAsUser": 60106,
+              "runAsGroup": 60106,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "inspection",
+                "mountPath": "/lab/inspection",
+                "readOnly": true
+              }
+            ]
+          },
+          {
+            "name": "wrong-peer",
+            "image": "adaptive-agentops-stage6:local",
+            "imagePullPolicy": "Never",
+            "command": [
+              "/usr/bin/sleep",
+              "infinity"
+            ],
+            "securityContext": {
+              "runAsUser": 60109,
+              "runAsGroup": 60109,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "proposal",
+                "mountPath": "/lab/proposal",
+                "readOnly": true
+              }
+            ]
+          }
+        ],
+        "volumes": [
+          {
+            "name": "audit-state",
+            "persistentVolumeClaim": {
+              "claimName": "audit-state"
+            }
+          },
+          {
+            "name": "controller-state",
+            "persistentVolumeClaim": {
+              "claimName": "controller-state"
+            }
+          },
+          {
+            "name": "inspection",
+            "persistentVolumeClaim": {
+              "claimName": "inspection"
+            }
+          },
+          {
+            "name": "operator",
+            "persistentVolumeClaim": {
+              "claimName": "operator"
+            }
+          },
+          {
+            "name": "proposal",
+            "persistentVolumeClaim": {
+              "claimName": "proposal"
+            }
+          },
+          {
+            "name": "target",
+            "persistentVolumeClaim": {
+              "claimName": "target"
+            }
+          },
+          {
+            "name": "target-state",
+            "persistentVolumeClaim": {
+              "claimName": "target-state"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

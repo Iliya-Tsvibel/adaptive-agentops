@@ -18,10 +18,9 @@ identity, tamper-resistant audit, container portability, and real recovery
 guarantees remain outside the accepted scope.
 
 The native campaign closed at **2/8** runs. All six unused authorizations
-expired and confer no execution authority. **Stage 6.D Docker Security
-Portability is PROPOSED / NOT AUTHORIZED.** Its architecture decision,
-implementation, and any new privileged campaign require separate owner
-authorization.
+expired and confer no execution authority. At Stage 6.E closure, Stage 6.D Docker Security
+Portability was proposed and required separate owner authorization. See the
+[subsequent Stage 6.D campaign](stage6d-progress.md).
 
 ## Campaign history
 

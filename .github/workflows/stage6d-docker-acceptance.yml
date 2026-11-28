@@ -1,0 +1,113 @@
+name: Stage 6.D Docker security acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed main commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage6d-docker-acceptance
+
+jobs:
+  docker-acceptance:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Iliya-Tsvibel/adaptive-agentops' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'Iliya-Tsvibel' &&
+      github.triggering_actor == 'Iliya-Tsvibel' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Verify authorized revision
+        env:
+          EXPECTED_STAGE6D_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [[ ! "$EXPECTED_STAGE6D_SHA" =~ ^[0-9a-f]{40}$ || "$GITHUB_SHA" != "$EXPECTED_STAGE6D_SHA" ]]; then
+            echo "::error title=Stage 6.D setup failure::Selected main revision does not match the reviewed SHA"
+            exit 1
+          fi
+          printf 'Stage 6.D reviewed revision %s\n' "$GITHUB_SHA"
+
+      - name: Check out approved main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download hash-pinned wheels as the runner user
+        run: |
+          trap 'if [[ $? -ne 0 ]]; then echo "::error title=Stage 6.D setup failure::Runner preflight or wheel download failed" >&2; fi' EXIT
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test "$(id -u)" -ne 0
+          command -v systemd-detect-virt >/dev/null
+          release=$(cat /proc/sys/kernel/osrelease)
+          if systemd-detect-virt --container --quiet; then
+            echo "A native Linux VM outside containers is required." >&2
+            exit 1
+          else
+            test "$?" -eq 1
+          fi
+          if [[ ${release,,} =~ microsoft|wsl ]]; then
+            echo "A native Linux VM outside containers and WSL is required." >&2
+            exit 1
+          fi
+          mkdir -m 0700 "$RUNNER_TEMP/stage6d-wheels"
+          /usr/bin/python3.12 -I -B -S scripts/stage42_native_acceptance.py pins .github/ci-requirements.txt \
+            > "$RUNNER_TEMP/stage6d-wheels/requirements.txt"
+          env -i PATH=/usr/bin:/bin PIP_CONFIG_FILE=/dev/null \
+            /usr/bin/python3.12 -I -B -m pip --isolated --disable-pip-version-check --no-cache-dir \
+            download --index-url https://pypi.org/simple --only-binary=:all: --require-hashes \
+            --dest "$RUNNER_TEMP/stage6d-wheels" -r "$RUNNER_TEMP/stage6d-wheels/requirements.txt"
+
+      - name: Enter the private PID namespace and run reviewed probes
+        run: |
+          /usr/bin/docker --host unix:///var/run/docker.sock version --format '{{.Server.Version}}'
+          image='python:3.12.16-bookworm@sha256:4209fae09a3e20afd863e528bfddc235da5fd5977983e1996cd54cc9a72e6267'
+          docker=(/usr/bin/docker --host unix:///var/run/docker.sock)
+          test "$(/usr/bin/git rev-parse HEAD)" = "$GITHUB_SHA"
+          setup=$(git --no-replace-objects cat-file blob "$GITHUB_SHA:scripts/stage42_native_setup.py")
+          security_options=$("${docker[@]}" info --format '{{json .SecurityOptions}}')
+          if [[ "$security_options" =~ name=(rootless|userns) ]]; then
+            echo 'The Stage 6.D fixture requires rootful Docker with the initial user namespace.' >&2
+            exit 1
+          fi
+          test "$("${docker[@]}" info --format '{{.OSType}}')" = linux
+          for uid in 60108 60109; do
+            if getent passwd "$uid" >/dev/null || getent group "$uid" >/dev/null; then
+              echo 'Reserved fixture identity is already assigned.' >&2
+              exit 1
+            fi
+          done
+          "${docker[@]}" pull "$image"
+          holder=$("${docker[@]}" run --detach --pull=never --network=none --ipc=none --read-only \
+            --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=128 \
+            --user 60108:60108 "$image" /usr/bin/sleep 480)
+          [[ "$holder" =~ ^[a-f0-9]{64}$ ]]
+          trap '"${docker[@]}" rm --force "$holder" >/dev/null' EXIT
+          read -r running holder_pid < <("${docker[@]}" inspect --format '{{.State.Running}} {{.State.Pid}}' "$holder")
+          [[ "$running" = true && "$holder_pid" =~ ^[1-9][0-9]*$ ]]
+          holder_namespace=$(sudo -n /usr/bin/readlink "/proc/$holder_pid/ns/pid")
+          test -n "$holder_namespace"
+          test "$(readlink /proc/self/ns/pid)" != "$holder_namespace"
+          /usr/bin/python3.12 -I -B -S -c "$setup" pack-stage61 "$GITHUB_SHA" "$RUNNER_TEMP/stage6d-wheels" |
+            sudo -n /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin STAGE6D_HOLDER="$holder"   \
+              /usr/bin/timeout --signal=INT --kill-after=5s 350s   \
+              /usr/bin/nsenter --target "$holder_pid" --pid -- /usr/bin/unshare --mount --mount-proc --net --   \
+              /usr/bin/sh -ec '
+                test "$(readlink /proc/1/ns/pid)" = "$(readlink /proc/self/ns/pid)"
+                test "$(awk "/^Uid:/{print \$2}" /proc/1/status)" = 60108
+                /usr/sbin/ip link set dev lo up
+                exec /usr/bin/python3.12 -I -B -S -c "$1" run-stage61
+              ' sh "$setup"

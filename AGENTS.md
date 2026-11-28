@@ -6,7 +6,9 @@ Stage 3 is LOCAL MVP ACCEPTED. **Stage 4 (ADR-0001 D01–D10) is formally ACCEPT
 local, nonproduction scope. The native campaign closed at 2/8 runs. All six
 unused authorizations expired and confer no transferable execution authority.
 See the owner decision in `docs/campaigns/stage6e-progress.md`.
-**Stage 6.D Docker Security Portability is PROPOSED / NOT AUTHORIZED.**
+The Stage 6.D Docker Security Portability campaign is separately authorized
+for bounded nonproduction engineering and validation. Formal acceptance
+remains with the owner. See `docs/campaigns/stage6d-progress.md`.
 
 ## Source of truth
 

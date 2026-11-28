@@ -25,7 +25,7 @@ def prepare(legacy):
         yield agent, operator, control, states["target"], sockets["apply"]
 
 
-def run(legacy, agent, operator, control, target_state, target):
+def run(legacy, agent, operator, control, target_state, target, *, container_proposal=None):
     print("START stage47 native hardened local acceptance", flush=True)
 
     def command(mode, *args):
@@ -49,6 +49,11 @@ def run(legacy, agent, operator, control, target_state, target):
     def proposal(resource="demo-api"):
         return invoke(legacy.AGENT, None, "proposal", resource)
 
+    def portable_proposal(resource="demo-api"):
+        if container_proposal is None:
+            return proposal(resource)
+        return container_proposal(legacy, agent, operator, control, target_state, target, resource)
+
     def evidence():
         return invoke(legacy.CONTROL, (), "evidence")
 
@@ -69,7 +74,8 @@ def run(legacy, agent, operator, control, target_state, target):
         legacy.require(proposal() is False and action("INSPECT_ACTION") is None, "Missing grant yielded authority")
         legacy.require(grant("ISSUE", "60", uid=APPROVER) is None, "Approver was allowed to issue a grant")
         issued = grant("ISSUE", "60")
-        legacy.require(issued[0] == "ACTIVE" and proposal("outside-scope") is False and proposal() is True,
+        legacy.require(issued[0] == "ACTIVE" and portable_proposal("outside-scope") is False
+                       and portable_proposal() is True,
                        "Protected proposal scope was not enforced")
         pending = action("INSPECT_ACTION")
         legacy.require(pending["tool"] == "mock.restart_service" and pending["resource"] == "demo-api",
@@ -106,7 +112,9 @@ def run(legacy, agent, operator, control, target_state, target):
     with server():
         legacy.require(action("DISPATCH", pending) is None, "Controller restart restored old authority")
         issued = grant("ISSUE", "60")
-        legacy.require(issued[0] == "ACTIVE" and proposal() is True, "Revocation setup failed")
+        legacy.require(issued[0] == "ACTIVE" and portable_proposal() is True, "Revocation setup failed")
+        if container_proposal is not None:
+            legacy.require(action("DISPATCH", pending) is None, "Replacement Agent restored old authority")
         revoked = action("INSPECT_ACTION")
         legacy.require(action("APPROVE", revoked) == "APPROVED"
                        and grant("REVOKE", issued[1])[0] == "REVOKED" and action("DISPATCH", revoked) is None,

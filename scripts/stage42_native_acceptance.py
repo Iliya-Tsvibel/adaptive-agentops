@@ -2,6 +2,7 @@
 
 from contextlib import ExitStack, contextmanager
 from hashlib import file_digest
+from functools import partial
 import json
 import os
 from pathlib import Path
@@ -164,7 +165,7 @@ def check_denials(legacy, path):
     print("PASS 4.2 missing expired and out-of-scope delegation and PDP denial", flush=True)
 
 
-def check_wrong_server(legacy, path):
+def check_wrong_server(legacy, path, *, invoke=client):
     with TemporaryDirectory(prefix="wrong-", dir=path.parent.parent) as directory:
         staging = Path(directory)
         os.chown(staging, legacy.TARGET, legacy.TARGET)
@@ -184,7 +185,7 @@ def check_wrong_server(legacy, path):
                     require((current.st_dev, current.st_ino) == (original.st_dev, original.st_ino),
                             "Wrong-server socket changed during staging")
                     legacy.check_socket_metadata(path, legacy.CONTROL, legacy.PROPOSERS)
-                    client(legacy, path, "WRONG_SERVER")
+                    invoke(legacy, path, "WRONG_SERVER")
                     require(finish(process, timeout=5) == "NO_PROPOSAL_BYTES",
                             "Wrong-UID server did not confirm zero proposal bytes")
                 finally:
@@ -294,7 +295,7 @@ def run(*, selected=42):
                 from scripts import stage47_native_acceptance
 
                 hardened_paths = resources.enter_context(stage47_native_acceptance.prepare(legacy))
-            if selected == 60:
+            if selected >= 60:
                 from scripts import stage6e_native_acceptance
 
                 evidence_paths = resources.enter_context(stage6e_native_acceptance.prepare(legacy))
@@ -325,9 +326,18 @@ def run(*, selected=42):
                 stage45_native_acceptance.run(legacy, *dispatch_paths)
             if selected >= 46:
                 stage46_native_acceptance.run(legacy, *effect_paths)
-            if selected >= 47:
+            if selected == 61:
+                from scripts import stage6d_docker_acceptance as docker
+
+                docker.check_peers(legacy, path)
+                stage47_native_acceptance.run(
+                    legacy, *hardened_paths,
+                    container_proposal=partial(docker.proposal, audit=evidence_paths[-2], inspector=evidence_paths[-1]),
+                )
+                print("PASS 6.D replacement Agent preserved native authority and simulated effect evidence", flush=True)
+            elif selected >= 47:
                 stage47_native_acceptance.run(legacy, *hardened_paths)
-            if selected == 60:
+            if selected >= 60:
                 stage6e_native_acceptance.run(legacy, *evidence_paths)
         except Exception:
             print_exc()
@@ -340,7 +350,7 @@ if __name__ == "__main__":
         print(*dependency_pins(Path(sys.argv[2])).values(), sep="\n")
     else:
         modes = {"run": 42, "run-stage43": 43, "run-stage44": 44, "run-stage45": 45, "run-stage46": 46, "run-stage47": 47,
-                 "run-stage60": 60}
+                 "run-stage60": 60, "run-stage61": 61}
         if len(sys.argv) == 2 and sys.argv[1] in modes:
             sys.exit(run(selected=modes[sys.argv[1]]))
         sys.exit("Expected pins MANIFEST or a supported native run mode")

@@ -1,0 +1,7 @@
+**
+!adaptive_agentops
+!adaptive_agentops/**
+!scripts
+!scripts/**
+!.github
+!.github/ci-requirements.txt

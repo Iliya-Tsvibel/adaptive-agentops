@@ -1,0 +1,79 @@
+name: Stage 6 Kubernetes and Argo CD acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact independently reviewed main revision
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage6-k8s-gitops
+
+jobs:
+  integration:
+    if: >-
+      github.repository == 'Iliya-Tsvibel/adaptive-agentops' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'Iliya-Tsvibel' &&
+      github.triggering_actor == 'Iliya-Tsvibel' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Verify authorized revision and runner
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ && "$GITHUB_SHA" = "$EXPECTED_SHA" ]]
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          ! grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease
+          if systemd-detect-virt --container --quiet; then
+            exit 1
+          else
+            test "$?" -eq 1
+          fi
+          printf 'Reviewed Stage 6 revision %s\n' "$GITHUB_SHA"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify upstream tools and run the disposable cluster
+        run: |
+          lab="$RUNNER_TEMP/aao-stage6"
+          mkdir -m 0700 "$lab"
+          install -d -m 0755 "$lab/bin"
+          cd "$lab/bin"
+          curl -fsSLo kind https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+          curl -fsSLo kubectl https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl
+          curl -fsSLo argocd.yaml https://raw.githubusercontent.com/argoproj/argo-cd/b4accc482028fd529b3e4508ef9f28977b552b50/manifests/namespace-install.yaml
+          sha256sum --check <<'CHECKSUMS'
+          aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  kind
+          6129359f4e1f3848a5572ccb0b26cf28b8ca08cef38c95a765b2f64a2c961a2f  kubectl
+          26fffd7bebba9097fb85088b1b2ff3d77d5e05c278ae8953cd9a385691d3d1e1  argocd.yaml
+          CHECKSUMS
+          chmod 0755 kind kubectl
+          export PATH="$lab/bin:$PATH"
+          export KUBECONFIG="$lab/kubeconfig"
+          cleanup() {
+            docker rm -f aao-stage6-git >/dev/null 2>&1 || true
+            kind delete cluster --name aao-stage6
+          }
+          trap cleanup EXIT
+          cd "$GITHUB_WORKSPACE"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          docker version --format '{{.Server.Version}}'
+          kind version
+          docker build --file deploy/stage6/Dockerfile --tag adaptive-agentops-stage6:local .
+          kind create cluster --name aao-stage6 --image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5 --wait 120s
+          kubectl version
+          kind load docker-image --name aao-stage6 adaptive-agentops-stage6:local
+          python3 scripts/stage6_k8s_lab.py "$lab/git" "$lab/bin/argocd.yaml"

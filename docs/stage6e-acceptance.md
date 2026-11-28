@@ -1,7 +1,8 @@
 # Stage 6.E technical assessment
 
-**TECHNICALLY COMPLETE — PENDING OWNER ACCEPTANCE. Production NO-GO.**
-The owner retains formal Stage 6.E acceptance.
+**OWNER ACCEPTED — NATIVE LINUX, LOCAL, NONPRODUCTION. Production NO-GO.**
+See the [formal owner decision and closed campaign](campaigns/stage6e-progress.md).
+The assessment below records the technical evidence for that decision.
 
 ## Scope and architecture
 

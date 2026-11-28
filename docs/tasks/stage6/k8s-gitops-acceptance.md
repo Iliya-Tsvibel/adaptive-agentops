@@ -31,7 +31,7 @@ only read and named Deployment patch/update, without workload exec,
 delete, persistent volume, secret, RBAC or policy writes. A bootstrap-owned
 ValidatingAdmissionPolicy freezes the Deployment spec. The harmless
 Git-controlled value is a top-level Deployment annotation. The repository
-is served read-only inside the lab's Docker network and no Git credential
+is served by Git upload-pack only inside the lab's Docker network and no Git credential
 is provided to Argo or CI. No automated pruning or cascade finalizer.
 
 Acceptance requires actual authenticated approval, simulated effect,

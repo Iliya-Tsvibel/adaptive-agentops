@@ -2,6 +2,12 @@
 
 Stage 3 is LOCAL MVP ACCEPTED. **Stage 4 (ADR-0001 D01–D10) is formally ACCEPTED for the local, nonproduction scope** following the [owner sign-off](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/24#issuecomment-7188763211). Stage 5 is formally ACCEPTED for the synthetic offline, nonproduction scope. Its campaign is closed, and unused native authorization does not transfer automatically to future work. See `docs/campaigns/stage5-progress.md` for the owner decision. Production remains NO-GO. See the [Stage 4 progress ledger](docs/campaigns/stage4-progress.md).
 
+**Stage 6.E is formally ACCEPTED and CLOSED** for the documented native Linux,
+local, nonproduction scope. The native campaign closed at 2/8 runs. All six
+unused authorizations expired and confer no transferable execution authority.
+See the owner decision in `docs/campaigns/stage6e-progress.md`.
+**Stage 6.D Docker Security Portability is PROPOSED / NOT AUTHORIZED.**
+
 ## Source of truth
 
 1. **Approved architecture, security and task contracts.** Read the [security rules](SECURITY.md), [Stage 4 architecture](docs/architecture/stage4-local.md), and the owner-approved contract for the task. See the [Stage 4.2 contract](docs/tasks/stage4/4.2-scoped-delegation-contract.md) for a historical accepted admission boundary; future work requires its own approved task contract.

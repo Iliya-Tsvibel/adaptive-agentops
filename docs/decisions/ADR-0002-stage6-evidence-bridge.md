@@ -1,7 +1,13 @@
 # ADR-0002 — Stage 6.E trusted evidence bridge
 
-**Proposed under the owner-authorized Stage 6.E campaign. Independent
-architecture review required before implementation. Production NO-GO.**
+**Accepted by the owner on 2026-11-28 for the documented native Linux,
+local, nonproduction scope. Production NO-GO.** See the
+[owner decision and campaign closure](../campaigns/stage6e-progress.md).
+
+The ADR was originally proposed under the owner-authorized Stage 6.E
+campaign and required independent architecture review before implementation.
+The [architecture PR and review](https://github.com/Iliya-Tsvibel/adaptive-agentops/pull/38)
+and the [technical assessment](../stage6e-acceptance.md) preserve that evidence.
 
 ## Context
 

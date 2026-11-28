@@ -185,17 +185,18 @@ class GitSource:
         run(*args, "add", "workload/deployment.json")
         run(*args, "-c", "user.name=Disposable lab", "-c", "user.email=lab@example.invalid", "commit", "-m", note)
         run(*args, "push", str(self.bare), "lab")
-        run("git", "--git-dir", str(self.bare), "update-server-info")
         return run(*args, "rev-parse", "HEAD").stdout.strip()
 
     def serve(self):
         run("docker", "run", "-d", "--name", GIT_CONTAINER, "--network", "kind", "--read-only", "--cap-drop=ALL",
             "--security-opt=no-new-privileges", "--user=65534:65534",
             "--mount", f"type=bind,source={self.bare.parent},target=/served,readonly", IMAGE,
-            "python", "-m", "http.server", "8080", "--directory", "/served")
+            "git", "-c", "safe.directory=/served/lab.git", "daemon", "--reuseaddr", "--listen=0.0.0.0", "--port=9418", "--base-path=/served",
+            "--export-all", "--strict-paths", "--disable=receive-pack", "--forbid-override=receive-pack",
+            "/served/lab.git")
         address = run("docker", "inspect", "--format", "{{.NetworkSettings.Networks.kind.IPAddress}}",
                       GIT_CONTAINER).stdout.strip()
-        return f"http://{address}:8080/lab.git"
+        return f"git://{address}:9418/lab.git"
 
 
 def observe(revision, note):
